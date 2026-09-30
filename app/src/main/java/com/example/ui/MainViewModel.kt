@@ -1,0 +1,301 @@
+package com.example.ui
+
+import android.app.Application
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.data.local.PostWithMedia
+import com.example.data.local.TruedownDatabase
+import com.example.data.preferences.UserPreferences
+import com.example.data.preferences.UserPreferencesRepository
+import com.example.data.provider.DownloadProvider
+import com.example.data.provider.TikWmDownloadProvider
+import com.example.data.storage.MediaStoreDownloader
+import com.example.domain.DownloadScheduler
+import com.example.domain.model.MediaKind
+import com.example.domain.model.PostType
+import com.example.domain.model.ProviderError
+import com.example.domain.model.ResolvedPost
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+sealed class ResolveState {
+    object Idle : ResolveState()
+    object Loading : ResolveState()
+    data class Success(val post: ResolvedPost) : ResolveState()
+    data class Error(val messageResId: Int) : ResolveState()
+}
+
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    val userPreferencesRepository = UserPreferencesRepository(application)
+    val database = TruedownDatabase.getInstance(application)
+    val downloadProvider: DownloadProvider = TikWmDownloadProvider()
+    val mediaStoreDownloader = MediaStoreDownloader(application)
+    val downloadScheduler = DownloadScheduler(application)
+
+    val preferences: StateFlow<UserPreferences> = userPreferencesRepository.userPreferencesFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UserPreferences())
+
+    private val _screenStack = MutableStateFlow<List<AppScreen>>(listOf(AppScreen.Home))
+    val currentScreen: StateFlow<AppScreen> = MutableStateFlow<AppScreen>(AppScreen.Home).apply {
+        viewModelScope.launch {
+            _screenStack.collect { stack ->
+                value = stack.lastOrNull() ?: AppScreen.Home
+            }
+        }
+    }
+
+    private val _resolveState = MutableStateFlow<ResolveState>(ResolveState.Idle)
+    val resolveState: StateFlow<ResolveState> = _resolveState.asStateFlow()
+
+    private val _detectedClipboardUrl = MutableStateFlow<String?>(null)
+    val detectedClipboardUrl: StateFlow<String?> = _detectedClipboardUrl.asStateFlow()
+
+    private val _toastEvent = MutableSharedFlow<String>()
+    val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
+
+    val recentPosts: StateFlow<List<PostWithMedia>> = database.postDao().getRecentPostsWithMedia(3)
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val allPosts: StateFlow<List<PostWithMedia>> = database.postDao().getAllPostsWithMedia()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    init {
+        // Reconcile stuck DOWNLOADING items on startup (AC-11)
+        viewModelScope.launch {
+            try {
+                database.mediaItemDao().reconcileStuckDownloadingItems()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun initializeStartingScreen(isShareIntent: Boolean = false) {
+        viewModelScope.launch {
+            val prefs = preferences.value
+            if (!prefs.onboardingCompleted && !isShareIntent) {
+                _screenStack.value = listOf(AppScreen.Onboarding)
+            } else if (_screenStack.value.isEmpty() || _screenStack.value.firstOrNull() == AppScreen.Onboarding) {
+                if (prefs.onboardingCompleted) {
+                    _screenStack.value = listOf(AppScreen.Home)
+                }
+            }
+        }
+    }
+
+    fun navigateTo(screen: AppScreen) {
+        val currentList = _screenStack.value.toMutableList()
+        if (screen is AppScreen.Home) {
+            _screenStack.value = listOf(AppScreen.Home)
+        } else {
+            currentList.add(screen)
+            _screenStack.value = currentList
+        }
+    }
+
+    fun popBackStack(): Boolean {
+        val currentList = _screenStack.value.toMutableList()
+        if (currentList.size > 1) {
+            currentList.removeAt(currentList.lastIndex)
+            _screenStack.value = currentList
+            return true
+        }
+        return false
+    }
+
+    fun checkClipboardForTikTokUrl(context: Context) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            if (clipboard != null && clipboard.hasPrimaryClip()) {
+                val description = clipboard.primaryClipDescription
+                if (description != null && (description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
+                            description.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML))) {
+                    val item = clipboard.primaryClip?.getItemAt(0)
+                    val text = item?.text?.toString()?.trim() ?: ""
+                    if (isTikTokUrl(text)) {
+                        _detectedClipboardUrl.value = text
+                        return
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        _detectedClipboardUrl.value = null
+    }
+
+    fun clearDetectedClipboardUrl() {
+        _detectedClipboardUrl.value = null
+    }
+
+    private fun isTikTokUrl(text: String): Boolean {
+        if (text.isBlank()) return false
+        val regex = Regex("https?://([a-zA-Z0-9_-]+\\.)?tiktok\\.com(/.*)?", RegexOption.IGNORE_CASE)
+        val shortRegex = Regex("https?://(vt|vm)\\.tiktok\\.com/([a-zA-Z0-9]+)", RegexOption.IGNORE_CASE)
+        return regex.containsMatchIn(text) || shortRegex.containsMatchIn(text) || text.contains("tiktok.com/")
+    }
+
+    fun resolveUrl(url: String, onNavigate: ((AppScreen) -> Unit)? = null) {
+        val cleanUrl = extractUrl(url)
+        if (cleanUrl.isBlank() || !isTikTokUrl(cleanUrl)) {
+            _resolveState.value = ResolveState.Error(com.example.R.string.error_invalid_link)
+            return
+        }
+
+        viewModelScope.launch {
+            _resolveState.value = ResolveState.Loading
+            val result = downloadProvider.resolve(cleanUrl)
+            result.onSuccess { resolvedPost ->
+                _resolveState.value = ResolveState.Success(resolvedPost)
+                if (resolvedPost.type == PostType.SLIDESHOW && resolvedPost.photoUrls.size > 1) {
+                    val nextScreen = AppScreen.SlideshowGrid(resolvedPost)
+                    navigateTo(nextScreen)
+                    onNavigate?.invoke(nextScreen)
+                } else {
+                    val nextScreen = AppScreen.Preview(resolvedPost)
+                    navigateTo(nextScreen)
+                    onNavigate?.invoke(nextScreen)
+                }
+            }.onFailure { error ->
+                val errorResId = when (error) {
+                    is ProviderError.InvalidLink -> com.example.R.string.error_invalid_link
+                    is ProviderError.NotTikTokLink -> com.example.R.string.error_not_tiktok
+                    is ProviderError.DouyinUnsupported -> com.example.R.string.error_douyin_unsupported
+                    is ProviderError.PostUnavailable -> com.example.R.string.error_post_unavailable
+                    is ProviderError.NetworkError -> com.example.R.string.error_network
+                    is ProviderError.TimeoutError -> com.example.R.string.error_timeout
+                    is ProviderError.RateLimited -> com.example.R.string.error_rate_limited
+                    else -> com.example.R.string.error_unknown
+                }
+                _resolveState.value = ResolveState.Error(errorResId)
+            }
+        }
+    }
+
+    private fun extractUrl(input: String): String {
+        val urlRegex = Regex("(https?://[a-zA-Z0-9_./%-]+)")
+        val match = urlRegex.find(input)
+        return match?.value ?: input.trim()
+    }
+
+    fun startDownload(post: ResolvedPost, downloadMp3Only: Boolean = false, selectedPhotoIndices: List<Int>? = null) {
+        viewModelScope.launch {
+            val kind = if (downloadMp3Only) MediaKind.AUDIO
+            else if (post.type == PostType.SLIDESHOW) MediaKind.PHOTO
+            else MediaKind.VIDEO
+
+            downloadScheduler.scheduleDownload(
+                post = post,
+                kind = kind,
+                photoIndices = selectedPhotoIndices ?: emptyList(),
+                explicitQuality = preferences.value.defaultQuality
+            )
+        }
+    }
+
+    fun deletePost(postWithMedia: PostWithMedia, deleteFromGallery: Boolean) {
+        viewModelScope.launch {
+            if (deleteFromGallery) {
+                postWithMedia.mediaItems.forEach { item ->
+                    if (item.mediaStoreUri.isNotBlank()) {
+                        try {
+                            val uri = android.net.Uri.parse(item.mediaStoreUri)
+                            getApplication<Application>().contentResolver.delete(uri, null, null)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+            database.postDao().deletePostById(postWithMedia.post.id)
+        }
+    }
+
+    fun clearAllLibrary(deleteFromGallery: Boolean) {
+        viewModelScope.launch {
+            if (deleteFromGallery) {
+                val all = database.postDao().getAllPostsWithMediaSync()
+                all.forEach { postWithMedia ->
+                    postWithMedia.mediaItems.forEach { item ->
+                        if (item.mediaStoreUri.isNotBlank()) {
+                            try {
+                                val uri = android.net.Uri.parse(item.mediaStoreUri)
+                                getApplication<Application>().contentResolver.delete(uri, null, null)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                }
+            }
+            database.postDao().deleteAllPosts()
+        }
+    }
+
+    fun setOnboardingCompleted() {
+        viewModelScope.launch {
+            userPreferencesRepository.setOnboardingCompleted(true)
+            _screenStack.value = listOf(AppScreen.Home)
+        }
+    }
+
+    fun resetOnboarding() {
+        viewModelScope.launch {
+            userPreferencesRepository.setOnboardingCompleted(false)
+            _screenStack.value = listOf(AppScreen.Onboarding)
+        }
+    }
+
+    fun updateLanguage(langCode: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setLanguage(langCode)
+        }
+    }
+
+    fun updateTheme(themeMode: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setThemeMode(themeMode)
+        }
+    }
+
+    fun updateDynamicColor(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setDynamicColor(enabled)
+        }
+    }
+
+    fun updateDefaultQuality(quality: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setDefaultQuality(quality)
+        }
+    }
+
+    fun updateQualityFallback(fallback: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setQualityFallback(fallback)
+        }
+    }
+
+    fun updateDuplicateRule(rule: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setDuplicateRule(rule)
+        }
+    }
+
+    fun updateShowNotificationActions(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setShowNotificationActions(enabled)
+        }
+    }
+}

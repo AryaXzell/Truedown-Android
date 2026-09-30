@@ -1,0 +1,188 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Release APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew || true
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Run Android Lint
+        run: ./gradlew lintDebug --no-daemon
+
+      - name: Prepare Signing Keystore
+        id: prepare-keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' && (github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')) }}
+        run: |
+          KEYSTORE_DIR="/tmp/truedown_signing"
+          mkdir -p "$KEYSTORE_DIR"
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_DIR/release.keystore"
+          echo "KEYSTORE_FILE=$KEYSTORE_DIR/release.keystore" >> $GITHUB_ENV
+          echo "has_keystore=true" >> $GITHUB_OUTPUT
+
+      - name: Build Release APKs
+        env:
+          KEYSTORE_FILE: ${{ env.KEYSTORE_FILE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK Signatures & Inspect ABI Contents
+        run: |
+          APK_DIR="app/build/outputs/apk/release"
+          echo "=== Inspecting Built APKs ==="
+          ls -la "$APK_DIR"/*.apk
+
+          ANDROID_SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_SDK_ROOT/build-tools/"* | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+
+          for apk in "$APK_DIR"/*.apk; do
+            echo "--------------------------------------------------"
+            echo "Inspecting: $(basename "$apk") (Size: $(du -h "$apk" | cut -f1))"
+            echo "Contents of lib/:"
+            unzip -l "$apk" | grep "lib/" || echo "No native libraries in lib/"
+
+            if [ "${{ steps.prepare-keystore.outputs.has_keystore }}" = "true" ]; then
+              echo "Verifying signature with apksigner:"
+              "$APKSIGNER" verify --verbose --print-certs "$apk" || {
+                echo "ERROR: apksigner verification failed for $apk"
+                exit 1
+              }
+            else
+              echo "Unsigned / Debug-signed build. Skipping strict apksigner verification."
+            fi
+          done
+
+      - name: Generate SHA-256 Checksums
+        run: |
+          cd app/build/outputs/apk/release
+          for apk in *.apk; do
+            sha256sum "$apk" > "$apk.sha256"
+          done
+          echo "Generated SHA-256 checksums:"
+          cat *.sha256
+
+      - name: Clean Up Keystore
+        if: always()
+        run: |
+          rm -rf /tmp/truedown_signing
+          rm -f /tmp/release.keystore
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: truedown-release-apks
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/*.sha256
+          retention-days: 14
+
+      - name: Upload Proguard Mapping Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: truedown-mapping-r8
+          path: app/build/outputs/mapping/release/mapping.txt
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-rc') && !contains(github.ref, '-test')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Built APK Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: truedown-release-apks
+          path: release-assets
+
+      - name: Extract Tag & Version
+        id: version
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare Release Notes
+        id: release_notes
+        run: |
+          if [ -f CHANGELOG.md ]; then
+            # Extract section for current release if possible
+            echo "Release notes extracted from CHANGELOG.md"
+          fi
+          cat << 'EOF' > release_body.md
+          ### Truedown Android Release
+
+          Download the APK matching your device architecture:
+          - **`arm64-v8a`**: Recommended for all modern 64-bit Android devices.
+          - **`armeabi-v7a`**: For older 32-bit Android devices.
+          - **`universal`**: Compatible with all supported devices (larger download size).
+
+          #### Verify Checksums:
+          Verify your download using the provided `.sha256` checksum files:
+          ```bash
+          sha256sum -c truedown-<version>-<abi>.apk.sha256
+          ```
+
+          ---
+          *Review CHANGELOG.md for full list of changes in this version.*
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag_name }}" \
+            release-assets/*.apk \
+            release-assets/*.sha256 \
+            --title "Truedown Android ${{ steps.version.outputs.tag_name }}" \
+            --notes-file release_body.md

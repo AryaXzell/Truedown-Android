@@ -1,0 +1,168 @@
+<resources>
+    <string name="app_name">Truedown</string>
+
+    <!-- General Navigation & Actions -->
+    <string name="nav_home">Home</string>
+    <string name="nav_library">Library</string>
+    <string name="action_back">Kembali</string>
+    <string name="action_close">Tutup</string>
+    <string name="action_cancel">Batal</string>
+    <string name="action_delete">Hapus</string>
+    <string name="action_retry">Coba lagi</string>
+    <string name="action_share">Bagikan</string>
+    <string name="action_open">Buka</string>
+    <string name="action_download">Download</string>
+    <string name="action_download_mp3">Download MP3</string>
+    <string name="action_download_this_photo">Download foto ini</string>
+    <string name="action_recheck">Periksa link</string>
+    <string name="action_paste">Tempel</string>
+    <string name="action_clear">Hapus teks</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_step_format">Langkah %1$d dari %2$d</string>
+    <string name="onboarding_skip">Lewati</string>
+    <string name="onboarding_next">Lanjut</string>
+    <string name="onboarding_start">Mulai</string>
+
+    <string name="onboarding_p1_title">Selamat Datang di Truedown</string>
+    <string name="onboarding_p1_subtitle">Simpan video, slideshow foto, dan audio TikTok tanpa watermark secepat kilat.</string>
+    <string name="onboarding_p1_lang_label">Pilih bahasa aplikasi:</string>
+
+    <string name="onboarding_p2_title">Fitur Unggulan</string>
+    <string name="onboarding_p2_feat1_title">Share Langsung dari TikTok</string>
+    <string name="onboarding_p2_feat1_desc">Pilih Share di TikTok lalu ketuk Truedown untuk mengunduh otomatis.</string>
+    <string name="onboarding_p2_feat2_title">Bebas Watermark &amp; MP3</string>
+    <string name="onboarding_p2_feat2_desc">Video jernih tanpa tanda air dan ekstraksi audio lagu TikTok.</string>
+    <string name="onboarding_p2_feat3_title">Pilih Foto Slideshow</string>
+    <string name="onboarding_p2_feat3_desc">Pilih satu atau beberapa foto dari slideshow sebelum mengunduh.</string>
+
+    <string name="onboarding_p3_title">Kualitas Video Default</string>
+    <string name="onboarding_p3_subtitle">Kamu bisa memilih resolusi video yang diinginkan saat mengunduh.</string>
+    <string name="quality_standard">Standar</string>
+    <string name="quality_standard_desc">Cepat diunduh dan hemat ruang penyimpanan.</string>
+    <string name="quality_hd">HD (Kualitas Tinggi)</string>
+    <string name="quality_hd_desc">Resolusi terbaik jika tersedia di TikTok.</string>
+
+    <string name="onboarding_storage_title">Izin Penyimpanan</string>
+    <string name="onboarding_storage_subtitle">Truedown memerlukan izin penyimpanan untuk menyimpan dan mengelola file unduhan (video, foto, audio) di memori dan galeri perangkat.</string>
+    <string name="onboarding_storage_status_active">Izin penyimpanan aktif</string>
+    <string name="onboarding_storage_status_needed">Izin penyimpanan dibutuhkan</string>
+    <string name="onboarding_storage_btn_allow">Izinkan Akses Penyimpanan</string>
+    <string name="onboarding_storage_btn_settings">Buka Pengaturan Sistem</string>
+    <string name="onboarding_storage_hint">Izin ini digunakan untuk menulis file ke Pictures, Movies, Music, serta menghapus file jika kamu memilihnya.</string>
+
+    <string name="onboarding_p4_title">Izin Notifikasi</string>
+    <string name="onboarding_p4_subtitle">Notifikasi diperlukan untuk memantau progres dan memberi tahu saat unduhan selesai.</string>
+    <string name="notif_status_active">Notifikasi sudah aktif</string>
+    <string name="notif_status_need_permission">Izin notifikasi dibutuhkan</string>
+    <string name="notif_status_denied">Notifikasi dinonaktifkan di pengaturan sistem</string>
+    <string name="notif_btn_allow">Izinkan Notifikasi</string>
+    <string name="notif_btn_settings">Buka Pengaturan</string>
+    <string name="notif_denied_hint">Jika ditolak, unduhan tetap berjalan tetapi progres tidak akan muncul di bilah status.</string>
+
+    <string name="onboarding_p5_title">Sudah Siap!</string>
+    <string name="onboarding_p5_subtitle">Berikut ringkasan pilihan pengaturan awal kamu:</string>
+    <string name="summary_language">Bahasa: %1$s</string>
+    <string name="summary_quality">Kualitas default: %1$s</string>
+    <string name="summary_storage">Penyimpanan: %1$s</string>
+    <string name="summary_notification">Notifikasi: %1$s</string>
+    <string name="summary_active">Aktif</string>
+    <string name="summary_inactive">Nonaktif</string>
+
+    <!-- Home Screen -->
+    <string name="home_input_label">Link postingan TikTok</string>
+    <string name="home_input_placeholder">Tempel link video atau foto TikTok di sini…</string>
+    <string name="home_clipboard_chip">Link terdeteksi: Tempel</string>
+    <string name="home_clipboard_detected_banner">Link TikTok Terdeteksi di Clipboard</string>
+    <string name="home_clipboard_auto_pasted">Link TikTok otomatis ditempel!</string>
+    <string name="home_clipboard_check_now">Periksa Sekarang</string>
+    <string name="home_checking_link">Memeriksa link…</string>
+    <string name="home_recent_title">Unduhan Terakhir</string>
+    <string name="home_recent_see_all">Lihat semua</string>
+    <string name="home_empty_title">Belum ada unduhan</string>
+    <string name="home_empty_subtitle">Tempel link di atas atau gunakan tombol Bagikan langsung dari aplikasi TikTok.</string>
+
+    <!-- Errors -->
+    <string name="error_invalid_link">Linknya gak kebaca, coba salin ulang ya.</string>
+    <string name="error_not_tiktok">Pastikan link berasal dari tiktok.com.</string>
+    <string name="error_douyin_unsupported">TikTok Douyin belum didukung saat ini.</string>
+    <string name="error_post_unavailable">Konten ini sudah tidak tersedia atau bersifat privat.</string>
+    <string name="error_network">Koneksi bermasalah, periksa internet kamu.</string>
+    <string name="error_timeout">Waktu pemeriksaan habis, coba lagi.</string>
+    <string name="error_rate_limited">Terlalu banyak permintaan, tunggu sebentar ya.</string>
+    <string name="error_unknown">Terjadi kendala tidak dikenal, coba lagi.</string>
+    <string name="error_storage_full">Ruang penyimpanan tidak mencukupi untuk mengunduh.</string>
+
+    <!-- Preview Screen -->
+    <string name="preview_title">Preview</string>
+    <string name="preview_downloading">Sedang diunduh…</string>
+    <string name="preview_already_downloaded">Sudah diunduh</string>
+    <string name="preview_starting_download">Mulai mengunduh…</string>
+
+    <!-- Library Screen -->
+    <string name="library_title">Library</string>
+    <string name="filter_all">Semua</string>
+    <string name="filter_video">Video</string>
+    <string name="filter_photo">Foto</string>
+    <string name="filter_audio">Audio</string>
+    <string name="library_empty_title">Belum ada unduhan</string>
+    <string name="library_empty_subtitle">Hasil unduhan kamu akan tersimpan dan tampil rapi di sini.</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_delete_title">Hapus dari Library?</string>
+    <string name="dialog_delete_also_gallery">Hapus file juga dari galeri</string>
+    <string name="dialog_delete_warning">Perhatian: File di galeri akan terhapus permanen.</string>
+    <string name="dialog_clear_all_title">Bersihkan Riwayat Library?</string>
+    <string name="dialog_clear_all_message">Semua catatan unduhan di Library akan dihapus.</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_group_appearance">Tampilan</string>
+    <string name="settings_theme_label">Tema aplikasi</string>
+    <string name="settings_theme_system">Ikuti sistem</string>
+    <string name="settings_theme_light">Mode terang</string>
+    <string name="settings_theme_dark">Mode gelap</string>
+    <string name="settings_dynamic_color_label">Warna dinamis</string>
+    <string name="settings_dynamic_color_desc">Menyesuaikan palet warna dengan wallpaper sistem</string>
+    <string name="settings_dynamic_color_unsupported">Fitur warna dinamis butuh Android 12 ke atas</string>
+    <string name="settings_lang_label">Bahasa</string>
+    <string name="settings_lang_system">Ikuti sistem</string>
+    <string name="settings_lang_id">Bahasa Indonesia</string>
+    <string name="settings_lang_en">English</string>
+
+    <string name="settings_group_download">Unduhan</string>
+    <string name="settings_default_quality_label">Kualitas video default</string>
+    <string name="settings_fallback_label">Jika kualitas tidak tersedia</string>
+    <string name="settings_fallback_auto">Turun otomatis ke Standar</string>
+    <string name="settings_fallback_fail">Gagal unduh</string>
+    <string name="settings_duplicate_label">Jika sudah pernah diunduh</string>
+    <string name="settings_duplicate_skip">Lewati (Skip) &amp; Info</string>
+    <string name="settings_duplicate_redownload">Unduh ulang</string>
+
+    <string name="settings_group_notifications">Notifikasi</string>
+    <string name="settings_notif_system_label">Status notifikasi sistem</string>
+    <string name="settings_notif_actions_label">Aksi di notifikasi selesai</string>
+    <string name="settings_notif_actions_desc">Tampilkan tombol Buka, Bagikan, dan Download MP3</string>
+
+    <string name="settings_group_storage">Penyimpanan &amp; Library</string>
+    <string name="settings_storage_location_title">Lokasi simpan</string>
+    <string name="settings_storage_location_desc">Tersimpan di Pictures, Movies, dan Music Truedown</string>
+    <string name="settings_clear_history_title">Bersihkan riwayat Library</string>
+    <string name="settings_clear_history_desc">Hapus seluruh riwayat unduhan di aplikasi</string>
+
+    <string name="settings_group_about">Tentang</string>
+    <string name="settings_check_update_title">Cek pembaruan</string>
+    <string name="settings_restart_onboarding">Ulangi onboarding</string>
+    <string name="settings_restart_onboarding_desc">Tampilkan kembali layar pengenalan awal aplikasi</string>
+
+    <!-- Notification Channels -->
+    <string name="notif_channel_progress">Progres Unduhan</string>
+    <string name="notif_channel_progress_desc">Menampilkan progres file yang sedang diunduh</string>
+    <string name="notif_channel_result">Hasil Unduhan</string>
+    <string name="notif_channel_result_desc">Pemberitahuan saat unduhan selesai atau gagal</string>
+    <string name="notif_channel_audio">Pemutar Audio</string>
+    <string name="notif_channel_audio_desc">Kontrol notifikasi pemutar audio</string>
+    <string name="notif_downloading">Sedang Mengunduh…</string>
+    <string name="notif_download_success">Unduhan Selesai</string>
+    <string name="notif_download_failed">Unduhan Gagal</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "Truedown",
+  "description": "TikTok Video, Slideshow, and MP3 Downloader without Watermark",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

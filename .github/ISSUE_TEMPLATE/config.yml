@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: General Questions & Usage
+    url: https://github.com/aryaxzell/truedown-android#readme
+    about: Please check the README and documentation before opening an issue.
+  - name: Security Vulnerability
+    url: https://github.com/aryaxzell/truedown-android/blob/main/SECURITY.md
+    about: Please read our security policy for reporting security concerns.
