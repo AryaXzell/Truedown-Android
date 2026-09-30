@@ -79,6 +79,38 @@ jobs:
         run: |
           ./gradlew assembleRelease --no-daemon --stacktrace
 
+      - name: Log R8 Optimization & Shrinking Results
+        run: |
+          echo "=================================================="
+          echo "         R8 OPTIMIZATION & SHRINKING REPORT       "
+          echo "=================================================="
+          MAPPING_DIR="app/build/outputs/mapping/release"
+          
+          if [ -d "$MAPPING_DIR" ]; then
+            echo "R8 Output Directory: $MAPPING_DIR"
+            ls -la "$MAPPING_DIR"
+            
+            if [ -f "$MAPPING_DIR/mapping.txt" ]; then
+              MAPPING_LINES=$(wc -l < "$MAPPING_DIR/mapping.txt")
+              echo "✓ R8 Minification is ACTIVE (mapping.txt has $MAPPING_LINES entries)."
+            else
+              echo "⚠ Warning: mapping.txt not found!"
+            fi
+            
+            if [ -f "$MAPPING_DIR/usage.txt" ]; then
+              DEAD_CODE_COUNT=$(wc -l < "$MAPPING_DIR/usage.txt")
+              echo "✓ Dead code eliminated by R8: $DEAD_CODE_COUNT unused classes/methods removed (usage.txt)."
+            fi
+            
+            if [ -f "$MAPPING_DIR/seeds.txt" ]; then
+              SEEDS_COUNT=$(wc -l < "$MAPPING_DIR/seeds.txt")
+              echo "✓ Preserved entry points (-keep rules): $SEEDS_COUNT items in seeds.txt."
+            fi
+          else
+            echo "⚠ Warning: R8 mapping folder was not generated at $MAPPING_DIR"
+          fi
+          echo "=================================================="
+
       - name: Verify APK Signatures & Inspect ABI Contents
         run: |
           APK_DIR="app/build/outputs/apk/release"
