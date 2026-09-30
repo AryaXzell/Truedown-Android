@@ -312,7 +312,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_check_update_title),
                     subtitle = "Buka halaman GitHub Releases",
                     onClick = {
-                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/"))
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aryaxzell/truedown-android/releases"))
                         context.startActivity(browserIntent)
                     },
                     testTag = "settings_update_row"

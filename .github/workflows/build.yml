@@ -153,22 +153,32 @@ jobs:
           rm -rf /tmp/truedown_signing
           rm -f /tmp/release.keystore
 
-      - name: Upload Release Artifacts
+      - name: Upload arm64-v8a (64-bit) APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: truedown-release-apks
+          name: truedown-arm64-v8a
           path: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/release/*.sha256
+            app/build/outputs/apk/release/*-arm64-v8a.apk
+            app/build/outputs/apk/release/*-arm64-v8a.apk.sha256
           retention-days: 14
 
-      - name: Upload Proguard Mapping Artifact
+      - name: Upload armeabi-v7a (32-bit) APK Artifact
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: truedown-mapping-r8
-          path: app/build/outputs/mapping/release/mapping.txt
-          retention-days: 30
+          name: truedown-armeabi-v7a
+          path: |
+            app/build/outputs/apk/release/*-armeabi-v7a.apk
+            app/build/outputs/apk/release/*-armeabi-v7a.apk.sha256
+          retention-days: 14
+
+      - name: Upload Universal APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: truedown-universal
+          path: |
+            app/build/outputs/apk/release/*-universal.apk
+            app/build/outputs/apk/release/*-universal.apk.sha256
+          retention-days: 14
 
   release:
     name: Publish GitHub Release
@@ -182,10 +192,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Download Built APK Artifacts
+      - name: Download arm64-v8a Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: truedown-release-apks
+          name: truedown-arm64-v8a
+          path: release-assets
+
+      - name: Download armeabi-v7a Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: truedown-armeabi-v7a
+          path: release-assets
+
+      - name: Download Universal Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: truedown-universal
           path: release-assets
 
       - name: Extract Tag & Version

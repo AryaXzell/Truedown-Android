@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -75,7 +75,6 @@ import com.example.ui.ResolveState
 @Composable
 fun HomeScreen(
     viewModel: MainViewModel,
-    onNavigateToSettings: () -> Unit,
     onNavigateToLibrary: () -> Unit,
     onNavigateToItemDetail: (PostWithMedia) -> Unit
 ) {
@@ -121,17 +120,6 @@ fun HomeScreen(
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
-                actions = {
-                    IconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.testTag("home_settings_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.settings_title)
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
@@ -144,6 +132,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (!detectedClipboardUrl.isNullOrBlank()) {

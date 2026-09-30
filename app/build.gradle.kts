@@ -24,6 +24,12 @@ val appVersionPatch = 0
 val baseVersionCode = appVersionMajor * 10000 + appVersionMinor * 100 + appVersionPatch
 val appVersionName = "$appVersionMajor.$appVersionMinor.$appVersionPatch"
 
+// Auto-increment build number per build to avoid Android version conflict / downgrade errors
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val localTimestampOffset = ((System.currentTimeMillis() - 1700000000000L) / 60000L).toInt().coerceAtLeast(1)
+val dynamicBuildNumber = ciRunNumber ?: (localTimestampOffset % 100000)
+val dynamicBaseVersionCode = (baseVersionCode * 100000) + dynamicBuildNumber
+
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2)
 
 android {
@@ -34,7 +40,7 @@ android {
         applicationId = "com.aistudio.truedown.kxmpzq"
         minSdk = 29
         targetSdk = 35
-        versionCode = baseVersionCode * 10 // default universal (code 0)
+        versionCode = (dynamicBaseVersionCode * 10) // default universal (code 0)
         versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -50,12 +56,17 @@ android {
     }
 
     signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
+        create("release") {
+            if (hasReleaseSigning) {
                 storeFile = file(releaseKeystorePath)
                 storePassword = releaseKeystorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
+            } else {
+                storeFile = file("${project.rootDir}/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
             }
         }
         getByName("debug") {
@@ -71,9 +82,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
         debug {
             signingConfig = signingConfigs.getByName("debug")
@@ -87,7 +96,7 @@ android {
                 val output = this as ApkVariantOutputImpl
                 val abiFilter = output.getFilter(OutputFile.ABI)
                 val abiCode = abiCodes[abiFilter] ?: 0
-                output.versionCodeOverride = (baseVersionCode * 10) + abiCode
+                output.versionCodeOverride = (dynamicBaseVersionCode * 10) + abiCode
 
                 val abiName = abiFilter ?: "universal"
                 output.outputFileName = "truedown-${variant.versionName}-$abiName.apk"

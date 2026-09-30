@@ -10,27 +10,51 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.example.domain.model.PostType
 import com.example.ui.AppScreen
@@ -136,49 +160,11 @@ fun MainAppContent(
     onFinishActivity: () -> Unit
 ) {
     val currentScreen by viewModel.currentScreen.collectAsState()
-
     val showBottomBar = currentScreen is AppScreen.Home || currentScreen is AppScreen.Library
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            AnimatedVisibility(
-                visible = showBottomBar,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = currentScreen is AppScreen.Home,
-                        onClick = { viewModel.navigateTo(AppScreen.Home) },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentScreen is AppScreen.Home) Icons.Filled.Home else Icons.Outlined.Home,
-                                contentDescription = stringResource(R.string.nav_home)
-                            )
-                        },
-                        label = { Text(stringResource(R.string.nav_home)) }
-                    )
-                    NavigationBarItem(
-                        selected = currentScreen is AppScreen.Library,
-                        onClick = { viewModel.navigateTo(AppScreen.Library) },
-                        icon = {
-                            Icon(
-                                imageVector = if (currentScreen is AppScreen.Library) Icons.Filled.PhotoLibrary else Icons.Outlined.PhotoLibrary,
-                                contentDescription = stringResource(R.string.nav_library)
-                            )
-                        },
-                        label = { Text(stringResource(R.string.nav_library)) }
-                    )
-                }
-            }
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Screen Content Layer
+        Box(modifier = Modifier.fillMaxSize()) {
             when (val screen = currentScreen) {
                 is AppScreen.Onboarding -> {
                     OnboardingScreen(
@@ -191,7 +177,6 @@ fun MainAppContent(
                 is AppScreen.Home -> {
                     HomeScreen(
                         viewModel = viewModel,
-                        onNavigateToSettings = { viewModel.navigateTo(AppScreen.Settings) },
                         onNavigateToLibrary = { viewModel.navigateTo(AppScreen.Library) },
                         onNavigateToItemDetail = { postWithMedia ->
                             if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
@@ -260,6 +245,144 @@ fun MainAppContent(
                     SettingsScreen(
                         viewModel = viewModel,
                         onBack = { viewModel.popBackStack() }
+                    )
+                }
+            }
+        }
+
+        // Floating Pill Navbar & Floating Pill Settings Button Overlay
+        AnimatedVisibility(
+            visible = showBottomBar,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Main Floating Pill Navbar (Home & Library)
+                Surface(
+                    shape = RoundedCornerShape(32.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier.testTag("floating_pill_navbar")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Home Pill Item
+                        FloatingNavPillItem(
+                            selected = currentScreen is AppScreen.Home,
+                            selectedIcon = Icons.Filled.Home,
+                            unselectedIcon = Icons.Outlined.Home,
+                            label = stringResource(R.string.nav_home),
+                            onClick = { viewModel.navigateTo(AppScreen.Home) },
+                            testTag = "nav_item_home"
+                        )
+
+                        // Library Pill Item
+                        FloatingNavPillItem(
+                            selected = currentScreen is AppScreen.Library,
+                            selectedIcon = Icons.Filled.PhotoLibrary,
+                            unselectedIcon = Icons.Outlined.PhotoLibrary,
+                            label = stringResource(R.string.nav_library),
+                            onClick = { viewModel.navigateTo(AppScreen.Library) },
+                            testTag = "nav_item_library"
+                        )
+                    }
+                }
+
+                // Individual Floating Pill Settings Button (Independent)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 4.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .clickable { viewModel.navigateTo(AppScreen.Settings) }
+                        .testTag("floating_settings_button")
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Settings,
+                            contentDescription = stringResource(R.string.settings_title),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingNavPillItem(
+    selected: Boolean,
+    selectedIcon: ImageVector,
+    unselectedIcon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+        label = "nav_pill_bg"
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "nav_pill_content"
+    )
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(backgroundColor)
+            .clickable { onClick() }
+            .padding(horizontal = if (selected) 16.dp else 12.dp, vertical = 10.dp)
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = if (selected) selectedIcon else unselectedIcon,
+                contentDescription = label,
+                tint = contentColor,
+                modifier = Modifier.size(22.dp)
+            )
+
+            AnimatedVisibility(
+                visible = selected,
+                enter = expandHorizontally() + fadeIn(),
+                exit = shrinkHorizontally() + fadeOut()
+            ) {
+                Row {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor,
+                        maxLines = 1
                     )
                 }
             }
