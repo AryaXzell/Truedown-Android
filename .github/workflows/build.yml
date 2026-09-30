@@ -39,8 +39,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Make Gradle Wrapper Executable
-        run: chmod +x ./gradlew || true
+      - name: Verify Gradle Wrapper
+        run: |
+          test -f ./gradlew || {
+            echo "::error::Gradle wrapper (./gradlew) is missing from the repository"
+            exit 1
+          }
+          chmod +x ./gradlew
+          ./gradlew --version
 
       - name: Run Unit Tests
         run: ./gradlew testDebugUnitTest --no-daemon
