@@ -1,10 +1,13 @@
 package com.aryaxzell.truedown.ui.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Folder
@@ -318,6 +322,32 @@ fun SettingsScreen(
                     testTag = "settings_storage_location_row",
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     iconTint = MaterialTheme.colorScheme.primary
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                val storageStatusText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    "Status Akses: Aktif (MediaStore API Ready)"
+                } else {
+                    val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                    if (granted) "Status Akses: Aktif" else "Status Akses: Perlu Izin Izin Penyimpanan"
+                }
+
+                SettingsClickableRow(
+                    icon = Icons.Default.CheckCircle,
+                    title = "Status Izin Penyimpanan",
+                    subtitle = storageStatusText,
+                    onClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar(storageStatusText)
+                        }
+                    },
+                    testTag = "settings_storage_status_row",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary
                 )
 
                 HorizontalDivider(

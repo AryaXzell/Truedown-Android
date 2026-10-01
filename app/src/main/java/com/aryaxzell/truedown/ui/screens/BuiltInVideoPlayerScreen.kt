@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -274,11 +275,11 @@ fun BuiltInVideoPlayerScreen(
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.92f))
                         )
                     )
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 32.dp)
             ) {
                 Slider(
                     value = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f),
@@ -295,21 +296,23 @@ fun BuiltInVideoPlayerScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text = formatTime(currentPosition),
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.9f),
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         text = formatTime(duration),
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = Color.White.copy(alpha = 0.9f),
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }

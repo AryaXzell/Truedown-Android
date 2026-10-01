@@ -21,6 +21,7 @@ import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
 import com.aryaxzell.truedown.util.UrlExtractor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -82,8 +83,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val downloadProgress: StateFlow<Map<String, DownloadProgress>> = DownloadProgressTracker.downloadProgressMap
 
     init {
-        // Reconcile stuck DOWNLOADING items on startup (AC-11)
-        viewModelScope.launch {
+        // Reconcile stuck DOWNLOADING items on startup asynchronously on IO thread
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 database.mediaItemDao().reconcileStuckDownloadingItems()
             } catch (e: Exception) {
@@ -95,8 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun initializeStartingScreen(isShareIntent: Boolean = false) {
         if (startupInitialized) return
         startupInitialized = true
-        viewModelScope.launch {
-            // Tunggu emisi pertama DataStore. Jangan baca preferences.value (masih default).
+        viewModelScope.launch(Dispatchers.IO) {
             val prefs = try {
                 userPreferencesRepository.userPreferencesFlow.first()
             } catch (e: Exception) {

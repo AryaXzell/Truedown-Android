@@ -14,20 +14,27 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.URI
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 class TikWmDownloadProvider(
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 ) : DownloadProvider {
 
     data class CachedEntry(val post: ResolvedPost, val timestamp: Long)
 
-    val memoryCache = ConcurrentHashMap<String, CachedEntry>()
+    val memoryCache: MutableMap<String, CachedEntry> = Collections.synchronizedMap(
+        object : LinkedHashMap<String, CachedEntry>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedEntry>?): Boolean {
+                return size > 15
+            }
+        }
+    )
     private val cacheDurationMs = 300_000L // 5 mins
 
     override fun getCached(url: String): ResolvedPost? {
