@@ -55,25 +55,24 @@ android {
         }
     }
 
+    val rootDebugKeystore = file("${project.rootDir}/debug.keystore")
+
     signingConfigs {
-        create("release") {
-            if (hasReleaseSigning) {
+        if (hasReleaseSigning) {
+            create("release") {
                 storeFile = file(releaseKeystorePath)
                 storePassword = releaseKeystorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
-            } else {
-                storeFile = file("${project.rootDir}/debug.keystore")
+            }
+        }
+        if (rootDebugKeystore.exists()) {
+            getByName("debug") {
+                storeFile = rootDebugKeystore
                 storePassword = "android"
                 keyAlias = "androiddebugkey"
                 keyPassword = "android"
             }
-        }
-        getByName("debug") {
-            storeFile = file("${project.rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
         }
     }
 
@@ -82,10 +81,16 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (rootDebugKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
         debug {
-            signingConfig = signingConfigs.getByName("debug")
+            if (rootDebugKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 
