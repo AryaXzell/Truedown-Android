@@ -78,6 +78,9 @@ interface MediaItemDao {
     @Query("UPDATE media_items SET status = :status, errorReason = :errorReason WHERE id = :id")
     suspend fun updateStatusFailed(id: Long, status: String, errorReason: String?)
 
+    @Query("UPDATE media_items SET status = :status WHERE id = :id")
+    suspend fun updateMediaItemStatus(id: Long, status: String)
+
     @Query("UPDATE media_items SET status = :newStatus WHERE status = :oldStatus")
     suspend fun reconcileOrphanStatus(oldStatus: String, newStatus: String)
 

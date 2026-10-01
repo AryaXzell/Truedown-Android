@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
@@ -95,6 +96,7 @@ import com.aryaxzell.truedown.domain.model.DownloadProgress
 import com.aryaxzell.truedown.domain.model.MediaKind
 import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
+import com.aryaxzell.truedown.domain.model.toHumanReadableSize
 import com.aryaxzell.truedown.ui.MainViewModel
 import com.aryaxzell.truedown.ui.components.ShimmerGalleryListSkeleton
 import com.aryaxzell.truedown.ui.components.ShimmerPostSkeletonItem
@@ -179,7 +181,12 @@ fun LibraryScreen(
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = 86.dp)
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -346,6 +353,9 @@ fun LibraryScreen(
                                         context.startActivity(Intent.createChooser(sendIntent, "Bagikan"))
                                     }
                                 }
+                            },
+                            onRetryClick = {
+                                viewModel.retryFailedDownload(postWithMedia)
                             }
                         )
                     }
@@ -498,7 +508,8 @@ private fun ExpressiveLibraryPostItem(
     batterySaver: Boolean = false,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    onShareClick: () -> Unit
+    onShareClick: () -> Unit,
+    onRetryClick: () -> Unit
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
@@ -506,6 +517,8 @@ private fun ExpressiveLibraryPostItem(
     val isDownloading = downloadProgress?.status == MediaStatus.DOWNLOADING ||
             downloadProgress?.status == MediaStatus.PENDING ||
             postWithMedia.mediaItems.any { it.status == MediaStatus.DOWNLOADING.name || it.status == MediaStatus.PENDING.name }
+
+    val isFailed = !isDownloading && postWithMedia.mediaItems.any { it.status == "FAILED" || it.status == MediaStatus.FAILED.name }
 
     val firstMedia = postWithMedia.mediaItems.firstOrNull { it.mediaStoreUri.isNotBlank() } ?: postWithMedia.mediaItems.firstOrNull()
     val thumbnailUri = firstMedia?.mediaStoreUri?.ifBlank { null }
@@ -560,9 +573,17 @@ private fun ExpressiveLibraryPostItem(
                                         .size(100, 100)
                                         .allowHardware(false)
                                         .crossfade(false)
+                                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
                                         .build()
                                 } else {
-                                    thumbnailUri
+                                    coil.request.ImageRequest.Builder(context)
+                                        .data(thumbnailUri)
+                                        .size(220, 220)
+                                        .crossfade(true)
+                                        .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
+                                        .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                        .build()
                                 },
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
@@ -682,6 +703,101 @@ private fun ExpressiveLibraryPostItem(
 
             if (isDownloading) {
                 val percent = downloadProgress?.progressPercent ?: 0
+                val bytesDownloaded = downloadProgress?.bytesDownloaded ?: 0L
+                val totalBytes = downloadProgress?.totalBytes ?: 0L
+                val startEpochMs = downloadProgress?.startEpochMs ?: System.currentTimeMillis()
+
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Circular Progress with text inside
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(54.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                progress = { (percent / 100f).coerceIn(0f, 1f) },
+                                strokeWidth = 4.5.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                            Text(
+                                text = "$percent%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Download status text and remaining time
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.preview_downloading),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            // Speed & Sisa Waktu
+                            val elapsedTimeSec = (System.currentTimeMillis() - startEpochMs) / 1000f
+                            val speedAndEtaText = if (elapsedTimeSec > 0.5f && bytesDownloaded > 0 && totalBytes > bytesDownloaded) {
+                                val speedBytesPerSec = bytesDownloaded / elapsedTimeSec
+                                val remainingBytes = totalBytes - bytesDownloaded
+                                val remainingSeconds = (remainingBytes / speedBytesPerSec).toLong()
+                                
+                                val speedStr = if (speedBytesPerSec >= 1024 * 1024) {
+                                    String.format(java.util.Locale.US, "%.1f MB/dtk", speedBytesPerSec / (1024.0 * 1024.0))
+                                } else {
+                                    String.format(java.util.Locale.US, "%.0f KB/dtk", speedBytesPerSec / 1024.0)
+                                }
+
+                                val etaStr = if (remainingSeconds < 60) {
+                                    "$remainingSeconds dtk"
+                                } else {
+                                    "${remainingSeconds / 60} m ${remainingSeconds % 60} dtk"
+                                }
+
+                                "$speedStr • Sisa $etaStr"
+                            } else {
+                                "Mengestimasi kecepatan..."
+                            }
+
+                            Text(
+                                text = speedAndEtaText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+
+                            if (totalBytes > 0) {
+                                Spacer(modifier = Modifier.height(1.dp))
+                                val sizeStr = "${bytesDownloaded.toHumanReadableSize()} / ${totalBytes.toHumanReadableSize()}"
+                                Text(
+                                    text = sizeStr,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isFailed) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -689,36 +805,38 @@ private fun ExpressiveLibraryPostItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = stringResource(R.string.preview_downloading),
+                            text = "Gagal mengunduh",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Text(
-                        text = "$percent%",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.ExtraBold
-                    )
+
+                    Button(
+                        onClick = onRetryClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(28.dp).testTag("retry_download_button_${postWithMedia.post.id}")
+                    ) {
+                        Text(
+                            text = "Coba Lagi",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                LinearProgressIndicator(
-                    progress = { (percent / 100f).coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primaryContainer
-                )
             }
         }
     }

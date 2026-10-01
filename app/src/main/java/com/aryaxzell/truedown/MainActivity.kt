@@ -195,11 +195,22 @@ fun MainAppContent(
                     stiffness = Spring.StiffnessMediumLow
                 )
 
-                if ((initialState is AppScreen.Home && targetState is AppScreen.Library) ||
-                    (initialState is AppScreen.Library && targetState is AppScreen.Home)) {
-                    // Fast crossfade for main tab navigation
-                    fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing))
-                        .togetherWith(fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing)))
+                if (initialState is AppScreen.Home && targetState is AppScreen.Library) {
+                    // Premium sliding transition to the left (forward)
+                    (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
+                            fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)))
+                        .togetherWith(
+                            slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } +
+                                    fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
+                        )
+                } else if (initialState is AppScreen.Library && targetState is AppScreen.Home) {
+                    // Premium sliding transition to the right (backward)
+                    (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } +
+                            fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)))
+                        .togetherWith(
+                            slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
+                                    fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
+                        )
                 } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings) {
                     // Container Transform Scale & Fade expansion into detail / preview / players
                     (scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)) +

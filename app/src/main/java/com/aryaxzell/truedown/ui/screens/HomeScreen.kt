@@ -221,7 +221,12 @@ fun HomeScreen(
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = 86.dp)
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         LazyColumn(

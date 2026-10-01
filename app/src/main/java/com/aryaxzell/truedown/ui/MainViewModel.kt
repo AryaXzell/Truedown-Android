@@ -17,6 +17,7 @@ import com.aryaxzell.truedown.domain.DownloadProgressTracker
 import com.aryaxzell.truedown.domain.DownloadScheduler
 import com.aryaxzell.truedown.domain.model.DownloadProgress
 import com.aryaxzell.truedown.domain.model.MediaKind
+import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
@@ -75,10 +76,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
 
     val recentPosts: StateFlow<List<PostWithMedia>> = database.postDao().getRecentPostsWithMedia(3)
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allPosts: StateFlow<List<PostWithMedia>> = database.postDao().getAllPostsWithMedia()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val downloadProgress: StateFlow<Map<String, DownloadProgress>> = DownloadProgressTracker.downloadProgressMap
 
@@ -359,5 +360,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearLogs() {
         com.aryaxzell.truedown.util.AppLogger.clear()
+    }
+
+    fun retryFailedDownload(postWithMedia: PostWithMedia) {
+        viewModelScope.launch {
+            val sourceUrl = postWithMedia.post.sourceUrl
+            if (sourceUrl.isBlank()) return@launch
+
+            val failedItems = postWithMedia.mediaItems.filter { it.status == "FAILED" || it.status == MediaStatus.FAILED.name }
+            if (failedItems.isEmpty()) return@launch
+
+            // 1. Mark failed items as PENDING to update UI states immediately
+            for (item in failedItems) {
+                database.mediaItemDao().updateMediaItemStatus(item.id, MediaStatus.PENDING.name)
+            }
+
+            // 2. Resolve link again to get fresh signed CDN URLs
+            val result = downloadProvider.resolve(sourceUrl)
+            result.onSuccess { resolvedPost ->
+                // 3. Reschedule each of the previously failed media items
+                for (item in failedItems) {
+                    val kind = when (item.kind) {
+                        "AUDIO", MediaKind.AUDIO.name -> MediaKind.AUDIO
+                        "PHOTO", MediaKind.PHOTO.name -> MediaKind.PHOTO
+                        else -> MediaKind.VIDEO
+                    }
+                    val photoIndices = if (kind == MediaKind.PHOTO) listOf(item.itemIndex) else emptyList()
+                    downloadScheduler.scheduleDownload(
+                        post = resolvedPost,
+                        kind = kind,
+                        photoIndices = photoIndices,
+                        explicitQuality = item.quality
+                    )
+                }
+            }.onFailure { error ->
+                // Restore FAILED status if resolving fails
+                for (item in failedItems) {
+                    database.mediaItemDao().updateMediaItemStatus(item.id, MediaStatus.FAILED.name)
+                }
+            }
+        }
     }
 }

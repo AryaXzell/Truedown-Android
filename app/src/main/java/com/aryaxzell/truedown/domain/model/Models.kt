@@ -76,5 +76,6 @@ data class DownloadProgress(
     val bytesDownloaded: Long = 0L,
     val totalBytes: Long = 0L,
     val status: MediaStatus = MediaStatus.PENDING,
-    val error: String? = null
+    val error: String? = null,
+    val startEpochMs: Long = System.currentTimeMillis()
 )
