@@ -131,6 +131,16 @@ fun HomeScreen(
     val detectedClipboardUrl by viewModel.detectedClipboardUrl.collectAsState()
     val recentPosts by viewModel.recentPosts.collectAsState()
     val downloadProgressMap by viewModel.downloadProgress.collectAsState()
+    val preferences by viewModel.preferences.collectAsState()
+
+    LaunchedEffect(detectedClipboardUrl) {
+        val url = detectedClipboardUrl
+        if (!url.isNullOrBlank() && preferences.autoDownloadOnDetect) {
+            urlInput = url
+            viewModel.clearDetectedClipboardUrl()
+            viewModel.resolveUrl(url)
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

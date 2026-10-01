@@ -27,6 +27,8 @@ class UserPreferencesRepository(private val context: Context) {
         val KEY_DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         val KEY_DOH_PROVIDER = stringPreferencesKey("doh_provider")
         val KEY_BATTERY_SAVER = booleanPreferencesKey("battery_saver")
+        val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only")
+        val KEY_AUTO_DOWNLOAD_ON_DETECT = booleanPreferencesKey("auto_download_on_detect")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
@@ -42,7 +44,9 @@ class UserPreferencesRepository(private val context: Context) {
             onboardingCompleted = preferences[KEY_ONBOARDING] ?: false,
             developerMode = preferences[KEY_DEVELOPER_MODE] ?: false,
             dohProvider = preferences[KEY_DOH_PROVIDER] ?: "SYSTEM",
-            batterySaver = preferences[KEY_BATTERY_SAVER] ?: false
+            batterySaver = preferences[KEY_BATTERY_SAVER] ?: false,
+            wifiOnly = preferences[KEY_WIFI_ONLY] ?: false,
+            autoDownloadOnDetect = preferences[KEY_AUTO_DOWNLOAD_ON_DETECT] ?: false
         )
     }
 
@@ -92,5 +96,13 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setBatterySaver(enabled: Boolean) {
         context.dataStore.edit { it[KEY_BATTERY_SAVER] = enabled }
+    }
+
+    suspend fun setWifiOnly(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_WIFI_ONLY] = enabled }
+    }
+
+    suspend fun setAutoDownloadOnDetect(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_AUTO_DOWNLOAD_ON_DETECT] = enabled }
     }
 }

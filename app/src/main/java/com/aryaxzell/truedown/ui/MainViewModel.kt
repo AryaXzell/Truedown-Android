@@ -335,6 +335,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateWifiOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setWifiOnly(enabled)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "Wi-Fi only set to $enabled")
+        }
+    }
+
+    fun updateAutoDownloadOnDetect(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setAutoDownloadOnDetect(enabled)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "Auto download on detect set to $enabled")
+        }
+    }
+
     fun updateDohProvider(providerKey: String) {
         viewModelScope.launch {
             userPreferencesRepository.setDohProvider(providerKey)

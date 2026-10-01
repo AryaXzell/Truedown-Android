@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
@@ -287,6 +288,46 @@ fun SettingsScreen(
                     testTag = "settings_battery_saver_switch",
                     iconContainerColor = MaterialTheme.colorScheme.errorContainer,
                     iconTint = MaterialTheme.colorScheme.error
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Wi-Fi Only Toggle
+                SettingsSwitchRow(
+                    icon = Icons.Default.Wifi,
+                    title = stringResource(R.string.settings_wifi_only_label),
+                    subtitle = stringResource(R.string.settings_wifi_only_desc),
+                    checked = preferences.wifiOnly,
+                    enabled = true,
+                    onCheckedChange = { enabled ->
+                        viewModel.updateWifiOnly(enabled)
+                    },
+                    testTag = "settings_wifi_only_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Auto-Download Toggle
+                SettingsSwitchRow(
+                    icon = Icons.Default.CheckCircle,
+                    title = stringResource(R.string.settings_auto_download_label),
+                    subtitle = stringResource(R.string.settings_auto_download_desc),
+                    checked = preferences.autoDownloadOnDetect,
+                    enabled = true,
+                    onCheckedChange = { enabled ->
+                        viewModel.updateAutoDownloadOnDetect(enabled)
+                    },
+                    testTag = "settings_auto_download_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary
                 )
             }
 

@@ -140,6 +140,12 @@
     <string name="settings_duplicate_label">If already downloaded</string>
     <string name="settings_duplicate_skip">Skip &amp; Info</string>
     <string name="settings_duplicate_redownload">Re-download</string>
+    <string name="settings_battery_saver_label">Battery Saver</string>
+    <string name="settings_battery_saver_desc">Reduce background monitoring and limit thumbnail image resolution to save battery &amp; memory</string>
+    <string name="settings_wifi_only_label">Download via Wi-Fi only</string>
+    <string name="settings_wifi_only_desc">Only download media when connected to a Wi-Fi network to save mobile cellular data</string>
+    <string name="settings_auto_download_label">Auto-Download on Detect</string>
+    <string name="settings_auto_download_desc">Automatically check and download TikTok links when detected in clipboard on app startup</string>
 
     <string name="settings_group_notifications">Notifications</string>
     <string name="settings_notif_system_label">System notification status</string>

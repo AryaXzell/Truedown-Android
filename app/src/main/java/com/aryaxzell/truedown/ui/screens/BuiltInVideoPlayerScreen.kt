@@ -3,6 +3,7 @@ package com.aryaxzell.truedown.ui.screens
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.net.Uri
+import android.os.Build
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
@@ -25,11 +26,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material3.Icon
@@ -74,6 +77,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun BuiltInVideoPlayerScreen(
     postWithMedia: PostWithMedia,
+    isInPipMode: Boolean = false,
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
@@ -191,7 +195,7 @@ fun BuiltInVideoPlayerScreen(
         )
 
         AnimatedVisibility(
-            visible = showControls,
+            visible = showControls && !isInPipMode,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter)
@@ -242,6 +246,36 @@ fun BuiltInVideoPlayerScreen(
                     ) {
                         IconButton(
                             onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    try {
+                                        activity?.enterPictureInPictureMode(
+                                            android.app.PictureInPictureParams.Builder().build()
+                                        )
+                                    } catch (_: Exception) {
+                                        activity?.enterPictureInPictureMode()
+                                    }
+                                } else {
+                                    activity?.enterPictureInPictureMode()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PictureInPicture,
+                                contentDescription = "Picture in Picture",
+                                tint = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.5f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        IconButton(
+                            onClick = {
                                 isLandscape = !isLandscape
                                 activity?.requestedOrientation = if (isLandscape) {
                                     ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -262,7 +296,7 @@ fun BuiltInVideoPlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = showControls,
+            visible = showControls && !isInPipMode,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center)
@@ -289,7 +323,7 @@ fun BuiltInVideoPlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = showControls,
+            visible = showControls && !isInPipMode,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)

@@ -140,6 +140,12 @@
     <string name="settings_duplicate_label">Jika sudah pernah diunduh</string>
     <string name="settings_duplicate_skip">Lewati (Skip) &amp; Info</string>
     <string name="settings_duplicate_redownload">Unduh ulang</string>
+    <string name="settings_battery_saver_label">Penghemat Baterai (Battery Saver)</string>
+    <string name="settings_battery_saver_desc">Mengurangi pemantauan background dan membatasi resolusi gambar thumbnail untuk menghemat daya &amp; memori</string>
+    <string name="settings_wifi_only_label">Download via Wi-Fi saja</string>
+    <string name="settings_wifi_only_desc">Hanya mengunduh konten ketika terhubung ke jaringan Wi-Fi untuk menghemat paket data seluler</string>
+    <string name="settings_auto_download_label">Unduh Otomatis Saat Terdeteksi (Auto-Download)</string>
+    <string name="settings_auto_download_desc">Otomatis memeriksa dan mengunduh tautan TikTok ketika terdeteksi di clipboard saat aplikasi dibuka</string>
 
     <string name="settings_group_notifications">Notifikasi</string>
     <string name="settings_notif_system_label">Status notifikasi sistem</string>

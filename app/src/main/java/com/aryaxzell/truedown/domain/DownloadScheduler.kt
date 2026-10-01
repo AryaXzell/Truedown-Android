@@ -33,6 +33,7 @@ class DownloadScheduler(private val context: Context) {
         try {
             val prefs = prefsRepo.userPreferencesFlow.first()
             val chosenQuality = explicitQuality ?: prefs.defaultQuality
+            val isWifiOnly = prefs.wifiOnly
 
             val postEntity = PostEntity(
                 id = post.id,
@@ -91,7 +92,8 @@ class DownloadScheduler(private val context: Context) {
                         mediaUrl = mediaUrl,
                         kind = MediaKind.VIDEO,
                         index = 0,
-                        quality = chosenQuality
+                        quality = chosenQuality,
+                        isWifiOnly = isWifiOnly
                     )
                 }
 
@@ -125,7 +127,8 @@ class DownloadScheduler(private val context: Context) {
                         mediaUrl = mediaUrl,
                         kind = MediaKind.AUDIO,
                         index = 0,
-                        quality = "STANDARD"
+                        quality = "STANDARD",
+                        isWifiOnly = isWifiOnly
                     )
                 }
 
@@ -167,7 +170,8 @@ class DownloadScheduler(private val context: Context) {
                             mediaUrl = photoUrl,
                             kind = MediaKind.PHOTO,
                             index = idx,
-                            quality = "STANDARD"
+                            quality = "STANDARD",
+                            isWifiOnly = isWifiOnly
                         )
                     }
                 }
@@ -185,7 +189,8 @@ class DownloadScheduler(private val context: Context) {
         mediaUrl: String,
         kind: MediaKind,
         index: Int,
-        quality: String
+        quality: String,
+        isWifiOnly: Boolean
     ) {
         val inputData = Data.Builder()
             .putLong(DownloadWorker.KEY_MEDIA_ITEM_ID, mediaItemId)
@@ -200,8 +205,16 @@ class DownloadScheduler(private val context: Context) {
             .putString(DownloadWorker.KEY_SOURCE_URL, post.sourceUrl)
             .build()
 
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiredNetworkType(
+                if (isWifiOnly) androidx.work.NetworkType.UNMETERED
+                else androidx.work.NetworkType.CONNECTED
+            )
+            .build()
+
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(inputData)
+            .setConstraints(constraints)
             .build()
 
         val uniqueWorkName = "download_${post.id}_${kind.name}_$index"

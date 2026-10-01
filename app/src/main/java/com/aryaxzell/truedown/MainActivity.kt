@@ -85,11 +85,21 @@ import com.aryaxzell.truedown.util.LocaleHelper
 import com.aryaxzell.truedown.util.NotificationHelper
 import com.aryaxzell.truedown.util.UrlExtractor
 import com.aryaxzell.truedown.work.CleanupWorker
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private val _isInPipMode = MutableStateFlow(false)
+    val isInPipMode: StateFlow<Boolean> = _isInPipMode.asStateFlow()
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        _isInPipMode.value = isInPictureInPictureMode
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(newBase)
@@ -113,6 +123,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val preferences by viewModel.preferences.collectAsState()
+            val pipMode by isInPipMode.collectAsState()
 
             // Dynamically apply locale when preference changes
             LaunchedEffect(preferences.language) {
@@ -125,6 +136,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 MainAppContent(
                     viewModel = viewModel,
+                    isInPipMode = pipMode,
                     onFinishActivity = { finish() }
                 )
             }
@@ -157,6 +169,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppContent(
     viewModel: MainViewModel,
+    isInPipMode: Boolean = false,
     onFinishActivity: () -> Unit
 ) {
     val startupReady by viewModel.startupReady.collectAsState()
@@ -166,7 +179,7 @@ fun MainAppContent(
     }
 
     val currentScreen by viewModel.currentScreen.collectAsState()
-    val showBottomBar = currentScreen is AppScreen.Home || currentScreen is AppScreen.Library
+    val showBottomBar = (currentScreen is AppScreen.Home || currentScreen is AppScreen.Library) && !isInPipMode
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Screen Content Layer with Material 3 Motion Patterns
@@ -275,6 +288,7 @@ fun MainAppContent(
                 is AppScreen.VideoPlayer -> {
                     BuiltInVideoPlayerScreen(
                         postWithMedia = screen.postWithMedia,
+                        isInPipMode = isInPipMode,
                         onClose = { viewModel.popBackStack() }
                     )
                 }

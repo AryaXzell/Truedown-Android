@@ -12,5 +12,7 @@ data class UserPreferences(
     val onboardingCompleted: Boolean = false,
     val developerMode: Boolean = false,
     val dohProvider: String = "SYSTEM",
-    val batterySaver: Boolean = false
+    val batterySaver: Boolean = false,
+    val wifiOnly: Boolean = false,
+    val autoDownloadOnDetect: Boolean = false
 )
