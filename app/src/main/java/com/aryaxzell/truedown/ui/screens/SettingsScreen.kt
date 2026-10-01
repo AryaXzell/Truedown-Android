@@ -5,8 +5,10 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +48,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -100,7 +104,8 @@ fun SettingsScreen(
                 title = {
                     Text(
                         text = stringResource(R.string.settings_title),
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 navigationIcon = {
@@ -112,19 +117,20 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
             // Card 1: Tampilan
             SettingsGroupCard(title = stringResource(R.string.settings_group_appearance)) {
@@ -139,10 +145,15 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_theme_label),
                     subtitle = themeLabel,
                     onClick = { showThemeDialog = true },
-                    testTag = "settings_theme_row"
+                    testTag = "settings_theme_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 // Dynamic Color Option
                 val isDynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -164,10 +175,15 @@ fun SettingsScreen(
                             snackbarHostState.showSnackbar(context.getString(R.string.settings_dynamic_color_unsupported))
                         }
                     },
-                    testTag = "settings_dynamic_color_switch"
+                    testTag = "settings_dynamic_color_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 // Language Option
                 val langLabel = when (preferences.language) {
@@ -180,7 +196,9 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_lang_label),
                     subtitle = langLabel,
                     onClick = { showLanguageDialog = true },
-                    testTag = "settings_language_row"
+                    testTag = "settings_language_row",
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconTint = MaterialTheme.colorScheme.tertiary
                 )
             }
 
@@ -196,10 +214,15 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_default_quality_label),
                     subtitle = qualityLabel,
                     onClick = { showQualityDialog = true },
-                    testTag = "settings_quality_row"
+                    testTag = "settings_quality_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 // Fallback Quality
                 val fallbackLabel = when (preferences.qualityFallback) {
@@ -211,10 +234,15 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_fallback_label),
                     subtitle = fallbackLabel,
                     onClick = { showFallbackDialog = true },
-                    testTag = "settings_fallback_row"
+                    testTag = "settings_fallback_row",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 // Duplicate Rule
                 val duplicateLabel = when (preferences.duplicateRule) {
@@ -226,7 +254,9 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_duplicate_label),
                     subtitle = duplicateLabel,
                     onClick = { showDuplicateDialog = true },
-                    testTag = "settings_duplicate_row"
+                    testTag = "settings_duplicate_row",
+                    iconContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    iconTint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -249,10 +279,15 @@ fun SettingsScreen(
                             context.startActivity(detailIntent)
                         }
                     },
-                    testTag = "settings_notif_system_row"
+                    testTag = "settings_notif_system_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 SettingsSwitchRow(
                     icon = Icons.Default.Info,
@@ -263,7 +298,9 @@ fun SettingsScreen(
                     onCheckedChange = { enabled ->
                         viewModel.updateShowNotificationActions(enabled)
                     },
-                    testTag = "settings_notif_actions_switch"
+                    testTag = "settings_notif_actions_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary
                 )
             }
 
@@ -278,10 +315,15 @@ fun SettingsScreen(
                             snackbarHostState.showSnackbar("File disimpan di Pictures/Truedown, Movies/Truedown, dan Music/Truedown")
                         }
                     },
-                    testTag = "settings_storage_location_row"
+                    testTag = "settings_storage_location_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 SettingsClickableRow(
                     icon = Icons.Default.DeleteSweep,
@@ -291,7 +333,9 @@ fun SettingsScreen(
                         clearFromGallery = false
                         showClearLibraryDialog = true
                     },
-                    testTag = "settings_clear_history_row"
+                    testTag = "settings_clear_history_row",
+                    iconContainerColor = MaterialTheme.colorScheme.errorContainer,
+                    iconTint = MaterialTheme.colorScheme.error
                 )
             }
 
@@ -302,10 +346,15 @@ fun SettingsScreen(
                     title = "Truedown Android",
                     subtitle = "Versi 1.0.0 (Build Release)",
                     onClick = {},
-                    testTag = "settings_version_row"
+                    testTag = "settings_version_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 SettingsClickableRow(
                     icon = Icons.AutoMirrored.Filled.OpenInNew,
@@ -315,10 +364,15 @@ fun SettingsScreen(
                         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aryaxzell/truedown-android/releases"))
                         context.startActivity(browserIntent)
                     },
-                    testTag = "settings_update_row"
+                    testTag = "settings_update_row",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary
                 )
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
 
                 SettingsClickableRow(
                     icon = Icons.Default.Refresh,
@@ -327,11 +381,13 @@ fun SettingsScreen(
                     onClick = {
                         viewModel.resetOnboarding()
                     },
-                    testTag = "settings_reset_onboarding_row"
+                    testTag = "settings_reset_onboarding_row",
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconTint = MaterialTheme.colorScheme.tertiary
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
@@ -339,7 +395,15 @@ fun SettingsScreen(
     if (showLanguageDialog) {
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
-            title = { Text(stringResource(R.string.settings_lang_label)) },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_lang_label),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column {
                     val langs = listOf(
@@ -351,12 +415,12 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     viewModel.updateLanguage(code)
                                     showLanguageDialog = false
                                 }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -366,15 +430,18 @@ fun SettingsScreen(
                                     showLanguageDialog = false
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text(stringResource(R.string.action_close))
+                TextButton(
+                    onClick = { showLanguageDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_close), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -384,7 +451,15 @@ fun SettingsScreen(
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
-            title = { Text(stringResource(R.string.settings_theme_label)) },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_theme_label),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column {
                     val themes = listOf(
@@ -396,12 +471,12 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     viewModel.updateTheme(mode)
                                     showThemeDialog = false
                                 }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -411,15 +486,18 @@ fun SettingsScreen(
                                     showThemeDialog = false
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) {
-                    Text(stringResource(R.string.action_close))
+                TextButton(
+                    onClick = { showThemeDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_close), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -429,7 +507,15 @@ fun SettingsScreen(
     if (showQualityDialog) {
         AlertDialog(
             onDismissRequest = { showQualityDialog = false },
-            title = { Text(stringResource(R.string.settings_default_quality_label)) },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_default_quality_label),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column {
                     val options = listOf(
@@ -440,12 +526,12 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     viewModel.updateDefaultQuality(q)
                                     showQualityDialog = false
                                 }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -455,15 +541,18 @@ fun SettingsScreen(
                                     showQualityDialog = false
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showQualityDialog = false }) {
-                    Text(stringResource(R.string.action_close))
+                TextButton(
+                    onClick = { showQualityDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_close), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -473,7 +562,15 @@ fun SettingsScreen(
     if (showFallbackDialog) {
         AlertDialog(
             onDismissRequest = { showFallbackDialog = false },
-            title = { Text(stringResource(R.string.settings_fallback_label)) },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_fallback_label),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column {
                     val options = listOf(
@@ -484,12 +581,12 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     viewModel.updateQualityFallback(fb)
                                     showFallbackDialog = false
                                 }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -499,15 +596,18 @@ fun SettingsScreen(
                                     showFallbackDialog = false
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFallbackDialog = false }) {
-                    Text(stringResource(R.string.action_close))
+                TextButton(
+                    onClick = { showFallbackDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_close), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -517,7 +617,15 @@ fun SettingsScreen(
     if (showDuplicateDialog) {
         AlertDialog(
             onDismissRequest = { showDuplicateDialog = false },
-            title = { Text(stringResource(R.string.settings_duplicate_label)) },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.settings_duplicate_label),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column {
                     val options = listOf(
@@ -528,12 +636,12 @@ fun SettingsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .clickable {
                                     viewModel.updateDuplicateRule(rule)
                                     showDuplicateDialog = false
                                 }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -543,15 +651,18 @@ fun SettingsScreen(
                                     showDuplicateDialog = false
                                 }
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showDuplicateDialog = false }) {
-                    Text(stringResource(R.string.action_close))
+                TextButton(
+                    onClick = { showDuplicateDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_close), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -561,35 +672,51 @@ fun SettingsScreen(
     if (showClearLibraryDialog) {
         AlertDialog(
             onDismissRequest = { showClearLibraryDialog = false },
-            title = { Text(stringResource(R.string.dialog_clear_all_title)) },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.dialog_clear_all_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column {
                     Text(stringResource(R.string.dialog_clear_all_message))
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable { clearFromGallery = !clearFromGallery }
                             .padding(vertical = 4.dp)
                     ) {
-                        Checkbox(
-                            checked = clearFromGallery,
-                            onCheckedChange = { clearFromGallery = it }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.dialog_delete_also_gallery),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Checkbox(
+                                checked = clearFromGallery,
+                                onCheckedChange = { clearFromGallery = it }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.dialog_delete_also_gallery),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                     if (clearFromGallery) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(R.string.dialog_delete_warning),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -603,14 +730,18 @@ fun SettingsScreen(
                             snackbarHostState.showSnackbar("Riwayat Library berhasil dibersihkan")
                         }
                     },
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text(stringResource(R.string.action_delete))
+                    Text(stringResource(R.string.action_delete), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearLibraryDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
+                TextButton(
+                    onClick = { showClearLibraryDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -626,15 +757,18 @@ private fun SettingsGroupCard(
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = 14.dp, bottom = 10.dp)
         )
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            shape = RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 2.dp,
+            border = BorderStroke(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
             )
         ) {
             Column {
@@ -650,29 +784,43 @@ private fun SettingsClickableRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    testTag: String
+    testTag: String,
+    iconContainerColor: androidx.compose.ui.graphics.Color? = null,
+    iconTint: androidx.compose.ui.graphics.Color? = null
 ) {
+    val containerBg = iconContainerColor ?: MaterialTheme.colorScheme.primaryContainer
+    val tint = iconTint ?: MaterialTheme.colorScheme.primary
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(16.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp)
-        )
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = containerBg,
+            modifier = Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (subtitle.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
@@ -695,12 +843,17 @@ private fun SettingsSwitchRow(
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onDisabledClick: (() -> Unit)? = null,
-    testTag: String
+    testTag: String,
+    iconContainerColor: androidx.compose.ui.graphics.Color? = null,
+    iconTint: androidx.compose.ui.graphics.Color? = null
 ) {
+    val containerBg = iconContainerColor ?: MaterialTheme.colorScheme.secondaryContainer
+    val tint = iconTint ?: MaterialTheme.colorScheme.secondary
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable {
                 if (enabled) {
                     onCheckedChange(!checked)
@@ -712,12 +865,20 @@ private fun SettingsSwitchRow(
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            modifier = Modifier.size(24.dp)
-        )
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = if (enabled) containerBg else MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.size(42.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (enabled) tint else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

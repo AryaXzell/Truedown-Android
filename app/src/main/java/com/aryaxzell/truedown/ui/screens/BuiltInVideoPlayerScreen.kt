@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
@@ -35,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -168,47 +171,67 @@ fun BuiltInVideoPlayerScreen(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = stringResource(R.string.action_close),
-                        tint = Color.White
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.75f), Color.Transparent)
+                        )
                     )
-                }
-
-                Text(
-                    text = postWithMedia.post.title.ifBlank { "Video Player" },
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
-                )
-
-                IconButton(
-                    onClick = {
-                        isLandscape = !isLandscape
-                        activity?.requestedOrientation = if (isLandscape) {
-                            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                        } else {
-                            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.5f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        IconButton(onClick = onClose) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.action_close),
+                                tint = Color.White
+                            )
                         }
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ScreenRotation,
-                        contentDescription = "Rotasi",
-                        tint = Color.White
+
+                    Text(
+                        text = postWithMedia.post.title.ifBlank { "Video Player" },
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f).padding(horizontal = 14.dp)
                     )
+
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.5f),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        IconButton(
+                            onClick = {
+                                isLandscape = !isLandscape
+                                activity?.requestedOrientation = if (isLandscape) {
+                                    ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                                } else {
+                                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ScreenRotation,
+                                contentDescription = "Rotasi",
+                                tint = Color.White
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -219,21 +242,24 @@ fun BuiltInVideoPlayerScreen(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center)
         ) {
-            Box(
+            Surface(
                 modifier = Modifier
-                    .size(64.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    .size(72.dp)
                     .clickable {
                         if (isPlaying) exoPlayer.pause() else exoPlayer.play()
                     },
-                contentAlignment = Alignment.Center
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.6f),
+                shadowElevation = 8.dp
             ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(36.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
             }
         }
 
@@ -246,9 +272,13 @@ fun BuiltInVideoPlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))
+                        )
+                    )
                     .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
             ) {
                 Slider(
                     value = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f),
@@ -260,7 +290,7 @@ fun BuiltInVideoPlayerScreen(
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        inactiveTrackColor = Color.White.copy(alpha = 0.35f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -271,13 +301,15 @@ fun BuiltInVideoPlayerScreen(
                 ) {
                     Text(
                         text = formatTime(currentPosition),
-                        color = Color.White.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.bodySmall
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = formatTime(duration),
-                        color = Color.White.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.bodySmall
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

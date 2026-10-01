@@ -118,13 +118,24 @@ class TikWmDownloadProvider(
                 val rawPlay = data.optString("play", "").takeIf { it.isNotBlank() }
                 val rawHdPlay = data.optString("hdplay", "").takeIf { it.isNotBlank() }
                 val rawMusic = data.optString("music", "").takeIf { it.isNotBlank() }
-                val rawCover = data.optString("cover", "").takeIf { it.isNotBlank() }
+                val rawCover = data.optString("cover", "")
+                    .ifBlank { data.optString("origin_cover", "") }
+                    .ifBlank { data.optString("dynamic_cover", "") }
+                    .takeIf { it.isNotBlank() }
 
                 val standardVideoUrl = rawPlay?.let { normalizeUrl(it) }
                 val hdVideoUrl = rawHdPlay?.let { normalizeUrl(it) }
                 val audioUrl = rawMusic?.let { normalizeUrl(it) }
                 val coverUrl = rawCover?.let { normalizeUrl(it) } ?: photoUrls.firstOrNull()
                 val durationSec = data.optInt("duration", 0)
+
+                val rawStandardSize = data.optLong("size", 0L).takeIf { it > 0 }
+                val rawHdSize = data.optLong("hd_size", 0L).takeIf { it > 0 }
+                val rawAudioSize = data.optJSONObject("music_info")?.optLong("size", 0L)?.takeIf { it > 0 }
+
+                val finalStandardSize = rawStandardSize ?: fetchContentLength(standardVideoUrl)
+                val finalHdSize = rawHdSize ?: fetchContentLength(hdVideoUrl)
+                val finalAudioSize = rawAudioSize ?: fetchContentLength(audioUrl)
 
                 val type = if (photoUrls.size > 1) PostType.SLIDESHOW else PostType.VIDEO
 
@@ -140,7 +151,10 @@ class TikWmDownloadProvider(
                     audioUrl = audioUrl,
                     coverUrl = coverUrl,
                     durationSec = durationSec,
-                    sourceUrl = cleanUrl
+                    sourceUrl = cleanUrl,
+                    videoStandardSizeBytes = finalStandardSize,
+                    videoHdSizeBytes = finalHdSize,
+                    audioSizeBytes = finalAudioSize
                 )
 
                 memoryCache[cleanUrl] = CachedEntry(resolved, System.currentTimeMillis())
@@ -180,6 +194,27 @@ class TikWmDownloadProvider(
             url.startsWith("//") -> "https:$url"
             url.startsWith("/") -> "https://www.tikwm.com$url"
             else -> url
+        }
+    }
+
+    private suspend fun fetchContentLength(url: String?): Long? {
+        if (url.isNullOrBlank()) return null
+        return withContext(Dispatchers.IO) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .head()
+                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
+                    .addHeader("Referer", "https://www.tiktok.com/")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val len = response.header("Content-Length")?.toLongOrNull()
+                        if (len != null && len > 0) return@withContext len
+                    }
+                }
+            } catch (_: Exception) {}
+            null
         }
     }
 }

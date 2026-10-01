@@ -2,6 +2,13 @@ package com.aryaxzell.truedown.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,31 +27,40 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -59,6 +75,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -68,14 +86,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.data.local.PostWithMedia
+import com.aryaxzell.truedown.domain.model.DownloadProgress
 import com.aryaxzell.truedown.domain.model.MediaKind
 import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.ui.MainViewModel
+import com.aryaxzell.truedown.ui.components.ShimmerGalleryListSkeleton
+import com.aryaxzell.truedown.ui.components.ShimmerPostSkeletonItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -114,108 +136,179 @@ fun LibraryScreen(
         }
     }
 
+    val videoCount = remember(allPosts) { allPosts.count { it.post.type == "VIDEO" || it.post.type == PostType.VIDEO.name } }
+    val photoCount = remember(allPosts) { allPosts.count { it.post.type == "SLIDESHOW" || it.post.type == PostType.SLIDESHOW.name } }
+    val audioCount = remember(allPosts) {
+        allPosts.count { postWithMedia ->
+            postWithMedia.mediaItems.any { it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = stringResource(R.string.library_title),
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = stringResource(R.string.library_title),
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        if (allPosts.isNotEmpty()) {
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                tonalElevation = 1.dp
+                            ) {
+                                Text(
+                                    text = "${allPosts.size}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Filter Chips
+            // Expressive Filter Chips Row
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
-                    FilterChip(
+                    ExpressiveFilterChip(
                         selected = currentFilter == LibraryFilter.ALL,
                         onClick = { currentFilter = LibraryFilter.ALL },
-                        label = { Text(stringResource(R.string.filter_all)) }
+                        label = stringResource(R.string.filter_all),
+                        count = allPosts.size
                     )
                 }
                 item {
-                    FilterChip(
+                    ExpressiveFilterChip(
                         selected = currentFilter == LibraryFilter.VIDEO,
                         onClick = { currentFilter = LibraryFilter.VIDEO },
-                        label = { Text(stringResource(R.string.filter_video)) }
+                        label = stringResource(R.string.filter_video),
+                        count = videoCount
                     )
                 }
                 item {
-                    FilterChip(
+                    ExpressiveFilterChip(
                         selected = currentFilter == LibraryFilter.PHOTO,
                         onClick = { currentFilter = LibraryFilter.PHOTO },
-                        label = { Text(stringResource(R.string.filter_photo)) }
+                        label = stringResource(R.string.filter_photo),
+                        count = photoCount
                     )
                 }
                 item {
-                    FilterChip(
+                    ExpressiveFilterChip(
                         selected = currentFilter == LibraryFilter.AUDIO,
                         onClick = { currentFilter = LibraryFilter.AUDIO },
-                        label = { Text(stringResource(R.string.filter_audio)) }
+                        label = stringResource(R.string.filter_audio),
+                        count = audioCount
                     )
                 }
             }
 
-            // Items List or Anime Character Empty State
+            // Items List or Expressive Empty State
             if (filteredPosts.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(horizontal = 24.dp, vertical = 32.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        tonalElevation = 1.dp
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_anime_empty_state),
-                            contentDescription = stringResource(R.string.library_empty_title),
+                        Column(
                             modifier = Modifier
-                                .size(180.dp)
-                                .testTag("library_anime_empty_state")
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = stringResource(R.string.library_empty_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.library_empty_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+                                .fillMaxWidth()
+                                .padding(vertical = 44.dp, horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(136.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.radialGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                                                MaterialTheme.colorScheme.surfaceContainer
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_anime_empty_state),
+                                    contentDescription = stringResource(R.string.library_empty_title),
+                                    modifier = Modifier
+                                        .size(104.dp)
+                                        .testTag("library_anime_empty_state")
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Text(
+                                text = stringResource(R.string.library_empty_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = stringResource(R.string.library_empty_subtitle),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 20.sp
+                            )
+                        }
                     }
                 }
             } else {
+                val activeDownloadingIds = remember(downloadProgressMap, filteredPosts) {
+                    downloadProgressMap.filter { (id, progress) ->
+                        (progress.status == MediaStatus.DOWNLOADING || progress.status == MediaStatus.PENDING) &&
+                                filteredPosts.none { it.post.id == id }
+                    }
+                }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    if (activeDownloadingIds.isNotEmpty()) {
+                        items(activeDownloadingIds.keys.toList(), key = { "shimmer_$it" }) { _ ->
+                            ShimmerPostSkeletonItem()
+                        }
+                    }
+
                     items(filteredPosts, key = { it.post.id }) { postWithMedia ->
                         val progress = downloadProgressMap[postWithMedia.post.id]
-                        LibraryPostItem(
+                        ExpressiveLibraryPostItem(
                             postWithMedia = postWithMedia,
                             downloadProgress = progress,
                             onClick = {
@@ -258,43 +351,54 @@ fun LibraryScreen(
     postToDelete?.let { postItem ->
         AlertDialog(
             onDismissRequest = { postToDelete = null },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
                 Text(
                     text = stringResource(R.string.dialog_delete_title),
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
                 )
             },
             text = {
                 Column {
                     Text(
                         text = "Apakah kamu yakin ingin menghapus '${postItem.post.title.ifBlank { "postingan ini" }}'?",
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .clickable { deleteFromGallery = !deleteFromGallery }
-                            .padding(vertical = 4.dp)
                     ) {
-                        Checkbox(
-                            checked = deleteFromGallery,
-                            onCheckedChange = { deleteFromGallery = it }
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.dialog_delete_also_gallery),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Checkbox(
+                                checked = deleteFromGallery,
+                                onCheckedChange = { deleteFromGallery = it }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.dialog_delete_also_gallery),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                     if (deleteFromGallery) {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(R.string.dialog_delete_warning),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -305,14 +409,18 @@ fun LibraryScreen(
                         viewModel.deletePost(postItem, deleteFromGallery)
                         postToDelete = null
                     },
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text(stringResource(R.string.action_delete))
+                    Text(stringResource(R.string.action_delete), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { postToDelete = null }) {
-                    Text(stringResource(R.string.action_cancel))
+                TextButton(
+                    onClick = { postToDelete = null },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
                 }
             }
         )
@@ -320,9 +428,66 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryPostItem(
+private fun ExpressiveFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    count: Int
+) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+        label = "filter_chip_bg"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "filter_chip_content"
+    )
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = bg,
+        tonalElevation = if (selected) 3.dp else 0.dp,
+        shadowElevation = if (selected) 2.dp else 0.dp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = contentColor
+            )
+            if (count > 0) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = if (selected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.22f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "$count",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = contentColor,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpressiveLibraryPostItem(
     postWithMedia: PostWithMedia,
-    downloadProgress: com.aryaxzell.truedown.domain.model.DownloadProgress? = null,
+    downloadProgress: DownloadProgress? = null,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onShareClick: () -> Unit
@@ -342,28 +507,39 @@ private fun LibraryPostItem(
         sdf.format(Date(postWithMedia.post.createdAt))
     }
 
-    Card(
+    val isVideo = postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(24.dp))
             .clickable { onClick() }
             .testTag("library_item_${postWithMedia.post.id}"),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        ),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 2.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .animateContentSize()
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Thumbnail
-                Card(
+                // High-fidelity Thumbnail with play badge
+                Surface(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                    shape = RoundedCornerShape(10.dp)
+                        .size(76.dp)
+                        .clip(RoundedCornerShape(18.dp)),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -373,22 +549,36 @@ private fun LibraryPostItem(
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
                                     .data(thumbnailUri)
+                                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                                    .addHeader("Referer", "https://www.tiktok.com/")
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
+                            if (isVideo) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.55f),
+                                    modifier = Modifier.size(30.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
                         } else {
                             Icon(
-                                imageVector = if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
-                                    Icons.Default.Movie
-                                } else {
-                                    Icons.Default.PhotoLibrary
-                                },
+                                imageVector = if (isVideo) Icons.Default.Movie else Icons.Default.PhotoLibrary,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
+                                modifier = Modifier.size(34.dp)
                             )
                         }
                     }
@@ -400,10 +590,11 @@ private fun LibraryPostItem(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = postWithMedia.post.title.ifBlank { "TikTok ${postWithMedia.post.authorName}" },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -411,59 +602,67 @@ private fun LibraryPostItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (postWithMedia.post.type == "SLIDESHOW" || postWithMedia.post.type == PostType.SLIDESHOW.name) {
-                                val doneCount = postWithMedia.mediaItems.count { it.status == "DONE" || it.status == MediaStatus.DONE.name }
-                                "$doneCount Foto"
-                            } else {
-                                "Video MP4"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = if (postWithMedia.post.type == "SLIDESHOW" || postWithMedia.post.type == PostType.SLIDESHOW.name) {
+                                    val doneCount = postWithMedia.mediaItems.count { it.status == "DONE" || it.status == MediaStatus.DONE.name }
+                                    "$doneCount Foto"
+                                } else {
+                                    "Video MP4"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "•  $dateFormatted",
+                            text = dateFormatted,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                // Menu button
+                // Quick Action / Menu button
                 Box {
                     IconButton(onClick = { menuExpanded = true }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Menu"
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     DropdownMenu(
                         expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
+                        onDismissRequest = { menuExpanded = false },
+                        modifier = Modifier.clip(RoundedCornerShape(18.dp))
                     ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_share)) },
+                            text = { Text(stringResource(R.string.action_share), fontWeight = FontWeight.Medium) },
                             onClick = {
                                 menuExpanded = false
                                 onShareClick()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Share, contentDescription = null)
+                                Icon(Icons.Outlined.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) },
+                            text = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium) },
                             onClick = {
                                 menuExpanded = false
                                 onDeleteClick()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                             }
                         )
                     }
@@ -472,32 +671,42 @@ private fun LibraryPostItem(
 
             if (isDownloading) {
                 val percent = downloadProgress?.progressPercent ?: 0
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = stringResource(R.string.preview_downloading),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.preview_downloading),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                     Text(
                         text = "$percent%",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                androidx.compose.material3.LinearProgressIndicator(
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
                     progress = { (percent / 100f).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primaryContainer
                 )
             }
         }

@@ -2,6 +2,13 @@ package com.aryaxzell.truedown.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,13 +20,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +40,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -42,12 +56,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -98,6 +116,18 @@ fun BuiltInAudioPlayerScreen(
         }
     }
 
+    // Infinite rotation animation for vinyl disc when playing
+    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_rotate")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "vinyl_angle"
+    )
+
     LaunchedEffect(exoPlayer) {
         while (true) {
             if (exoPlayer.isPlaying) {
@@ -125,7 +155,8 @@ fun BuiltInAudioPlayerScreen(
                 title = {
                     Text(
                         text = "Pemutar Audio",
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 navigationIcon = {
@@ -137,39 +168,64 @@ fun BuiltInAudioPlayerScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Card(
+            // Animated Vinyl Disc Representation
+            Surface(
                 modifier = Modifier
-                    .size(220.dp)
-                    .clip(CircleShape),
+                    .size(240.dp)
+                    .clip(CircleShape)
+                    .rotate(if (isPlaying) rotationAngle else 0f),
                 shape = CircleShape,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                shadowElevation = 12.dp,
+                tonalElevation = 8.dp,
+                border = BorderStroke(
+                    4.dp,
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                )
             ) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
+                                    MaterialTheme.colorScheme.surfaceContainerLowest
+                                )
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Audiotrack,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(96.dp)
-                    )
+                    // Center Vinyl Hole
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.size(64.dp),
+                        shadowElevation = 4.dp
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Audiotrack,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                    }
                 }
             }
 
@@ -177,16 +233,17 @@ fun BuiltInAudioPlayerScreen(
 
             Text(
                 text = postWithMedia.post.title.ifBlank { "Audio TikTok" },
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onBackground
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = "@${postWithMedia.post.authorHandle.ifBlank { postWithMedia.post.authorName }}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -199,7 +256,12 @@ fun BuiltInAudioPlayerScreen(
                     exoPlayer.seekTo(seekPos)
                     currentPosition = seekPos
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                    inactiveTrackColor = MaterialTheme.colorScheme.primaryContainer
+                )
             )
 
             Row(
@@ -208,42 +270,102 @@ fun BuiltInAudioPlayerScreen(
             ) {
                 Text(
                     text = formatTime(currentPosition),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = formatTime(duration),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            IconButton(
-                onClick = {
-                    if (isEnded) {
-                        exoPlayer.seekTo(0)
-                        exoPlayer.play()
-                        isEnded = false
-                    } else {
-                        if (isPlaying) exoPlayer.pause() else exoPlayer.play()
-                    }
-                },
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-                    .testTag("audio_play_pause_button")
+            // Playback Control Cluster (Replay 10s, Play/Pause, Forward 10s)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                Icon(
-                    imageVector = if (isEnded) Icons.Default.Replay
-                    else if (isPlaying) Icons.Default.Pause
-                    else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(36.dp)
-                )
+                // Rewind 10s
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            val newPos = (currentPosition - 10000L).coerceAtLeast(0L)
+                            exoPlayer.seekTo(newPos)
+                            currentPosition = newPos
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Replay10,
+                            contentDescription = "Mundur 10 detik",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
+
+                // Play / Pause Button with tactile glow
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .size(76.dp)
+                        .clip(CircleShape)
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (isEnded) {
+                                exoPlayer.seekTo(0)
+                                exoPlayer.play()
+                                isEnded = false
+                            } else {
+                                if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("audio_play_pause_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isEnded) Icons.Default.Replay
+                            else if (isPlaying) Icons.Default.Pause
+                            else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(38.dp)
+                        )
+                    }
+                }
+
+                // Forward 10s
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            val newPos = (currentPosition + 10000L).coerceAtMost(duration)
+                            exoPlayer.seekTo(newPos)
+                            currentPosition = newPos
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Forward10,
+                            contentDescription = "Maju 10 detik",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                }
             }
         }
     }

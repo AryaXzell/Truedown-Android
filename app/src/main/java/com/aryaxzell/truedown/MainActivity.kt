@@ -9,12 +9,20 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -74,6 +82,7 @@ import com.aryaxzell.truedown.ui.theme.TruedownTheme
 import com.aryaxzell.truedown.util.LocaleHelper
 import com.aryaxzell.truedown.util.NotificationHelper
 import com.aryaxzell.truedown.util.UrlExtractor
+import com.aryaxzell.truedown.work.CleanupWorker
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -93,6 +102,9 @@ class MainActivity : ComponentActivity() {
 
         // Initialize notification channels
         NotificationHelper.createNotificationChannels(this)
+
+        // Schedule periodic cache and temporary files cleanup
+        CleanupWorker.schedule(this)
 
         val isShareIntent = if (savedInstanceState == null) handleIncomingShareIntent(intent) else false
         viewModel.initializeStartingScreen(isShareIntent)
@@ -178,9 +190,65 @@ fun MainAppContent(
     val showBottomBar = currentScreen is AppScreen.Home || currentScreen is AppScreen.Library
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Screen Content Layer
-        Box(modifier = Modifier.fillMaxSize()) {
-            when (val screen = currentScreen) {
+        // Screen Content Layer with Material 3 Motion Patterns
+        AnimatedContent(
+            targetState = currentScreen,
+            transitionSpec = {
+                val enterSpec = spring<Float>(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+                val exitSpec = spring<Float>(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+
+                if (initialState is AppScreen.Home && targetState is AppScreen.Library) {
+                    // Material Design 3 Container Transform Expansion: Main Downloader -> Gallery / Library View
+                    (scaleIn(
+                        initialScale = 0.90f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+                    ) + fadeIn(animationSpec = enterSpec))
+                        .togetherWith(
+                            scaleOut(
+                                targetScale = 1.05f,
+                                animationSpec = exitSpec
+                            ) + fadeOut(animationSpec = exitSpec)
+                        )
+                } else if (initialState is AppScreen.Library && targetState is AppScreen.Home) {
+                    // Material Design 3 Container Transform Collapse: Gallery / Library View -> Main Downloader
+                    (scaleIn(
+                        initialScale = 1.05f,
+                        animationSpec = enterSpec
+                    ) + fadeIn(animationSpec = enterSpec))
+                        .togetherWith(
+                            scaleOut(
+                                targetScale = 0.90f,
+                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+                            ) + fadeOut(animationSpec = exitSpec)
+                        )
+                } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings) {
+                    // Container Transform Scale & Fade expansion into detail / preview / players
+                    (scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)) +
+                            fadeIn(animationSpec = enterSpec))
+                        .togetherWith(
+                            scaleOut(targetScale = 1.04f, animationSpec = exitSpec) +
+                                    fadeOut(animationSpec = exitSpec)
+                        )
+                } else {
+                    // Container Transform Collapse back to parent
+                    (scaleIn(initialScale = 1.04f, animationSpec = enterSpec) +
+                            fadeIn(animationSpec = enterSpec))
+                        .togetherWith(
+                            scaleOut(targetScale = 0.90f, animationSpec = exitSpec) +
+                                    fadeOut(animationSpec = exitSpec)
+                        )
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+            label = "screen_motion_transition"
+        ) { screen ->
+            when (screen) {
                 is AppScreen.Onboarding -> {
                     OnboardingScreen(
                         viewModel = viewModel,

@@ -10,6 +10,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -48,6 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,6 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -69,6 +75,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.ui.MainViewModel
@@ -125,29 +132,36 @@ fun OnboardingScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Step Indicator Dots
+                // Expressive Animated Step Indicator Dots
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 14.dp)
                 ) {
                     repeat(5) { index ->
                         val isSelected = pagerState.currentPage == index
+                        val width by animateDpAsState(
+                            targetValue = if (isSelected) 24.dp else 8.dp,
+                            animationSpec = spring(),
+                            label = "dot_width"
+                        )
                         Box(
                             modifier = Modifier
-                                .padding(4.dp)
-                                .size(if (isSelected) 10.dp else 8.dp)
+                                .padding(horizontal = 4.dp)
+                                .height(8.dp)
+                                .width(width)
                                 .clip(CircleShape)
                                 .background(
                                     if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                                 )
                         )
                     }
@@ -155,9 +169,10 @@ fun OnboardingScreen(
 
                 Text(
                     text = stringResource(R.string.onboarding_step_format, pagerState.currentPage + 1, 5),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
                 Row(
@@ -172,9 +187,14 @@ fun OnboardingScreen(
                                     pagerState.animateScrollToPage(4)
                                 }
                             },
+                            shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.testTag("onboarding_skip_button")
                         ) {
-                            Text(stringResource(R.string.onboarding_skip))
+                            Text(
+                                text = stringResource(R.string.onboarding_skip),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
 
                         Button(
@@ -183,9 +203,14 @@ fun OnboardingScreen(
                                     pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                 }
                             },
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                             modifier = Modifier.testTag("onboarding_next_button")
                         ) {
-                            Text(stringResource(R.string.onboarding_next))
+                            Text(
+                                text = stringResource(R.string.onboarding_next),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     } else {
                         Button(
@@ -193,11 +218,21 @@ fun OnboardingScreen(
                                 viewModel.setOnboardingCompleted()
                                 onFinished()
                             },
+                            shape = RoundedCornerShape(18.dp),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 3.dp,
+                                pressedElevation = 6.dp
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(54.dp)
                                 .testTag("onboarding_start_button")
                         ) {
-                            Text(stringResource(R.string.onboarding_start))
+                            Text(
+                                text = stringResource(R.string.onboarding_start),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold
+                            )
                         }
                     }
                 }
@@ -284,31 +319,44 @@ fun Page1WelcomeLanguage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.size(108.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shadowElevation = 4.dp
         ) {
-            Icon(
-                imageVector = Icons.Default.Download,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                MaterialTheme.colorScheme.primaryContainer
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Download,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(52.dp)
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         Text(
             text = stringResource(R.string.onboarding_p1_title),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Text(
             text = stringResource(R.string.onboarding_p1_subtitle),
@@ -319,28 +367,38 @@ fun Page1WelcomeLanguage(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            shape = RoundedCornerShape(16.dp)
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Language,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = stringResource(R.string.onboarding_p1_lang_label),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 val options = listOf(
                     "SYSTEM" to stringResource(R.string.settings_lang_system),
@@ -352,19 +410,20 @@ fun Page1WelcomeLanguage(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable { onLangSelected(code) }
-                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                            .padding(vertical = 10.dp, horizontal = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
                             selected = currentLang == code,
                             onClick = { onLangSelected(code) }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = label,
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
@@ -386,7 +445,7 @@ fun Page2Features() {
         Text(
             text = stringResource(R.string.onboarding_p2_title),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
         )
 
@@ -395,7 +454,9 @@ fun Page2Features() {
         FeatureCard(
             icon = Icons.Default.Share,
             title = stringResource(R.string.onboarding_p2_feat1_title),
-            description = stringResource(R.string.onboarding_p2_feat1_desc)
+            description = stringResource(R.string.onboarding_p2_feat1_desc),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            iconTint = MaterialTheme.colorScheme.primary
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -403,7 +464,9 @@ fun Page2Features() {
         FeatureCard(
             icon = Icons.Default.Audiotrack,
             title = stringResource(R.string.onboarding_p2_feat2_title),
-            description = stringResource(R.string.onboarding_p2_feat2_desc)
+            description = stringResource(R.string.onboarding_p2_feat2_desc),
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            iconTint = MaterialTheme.colorScheme.tertiary
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -411,7 +474,9 @@ fun Page2Features() {
         FeatureCard(
             icon = Icons.Default.PhotoLibrary,
             title = stringResource(R.string.onboarding_p2_feat3_title),
-            description = stringResource(R.string.onboarding_p2_feat3_desc)
+            description = stringResource(R.string.onboarding_p2_feat3_desc),
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            iconTint = MaterialTheme.colorScheme.secondary
         )
     }
 }
@@ -420,30 +485,34 @@ fun Page2Features() {
 private fun FeatureCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
-    description: String
+    description: String,
+    containerColor: androidx.compose.ui.graphics.Color,
+    iconTint: androidx.compose.ui.graphics.Color
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(16.dp)
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(22.dp),
+        tonalElevation = 2.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(18.dp),
             verticalAlignment = Alignment.Top
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(46.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = containerColor
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column {
@@ -456,7 +525,8 @@ private fun FeatureCard(
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 20.sp
                 )
             }
         }
@@ -477,34 +547,35 @@ fun Page3StoragePermission(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(
-                    if (hasPermission) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.secondaryContainer
-                ),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.size(108.dp),
+            shape = CircleShape,
+            color = if (hasPermission) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+            shadowElevation = 4.dp
         ) {
-            Icon(
-                imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Folder,
-                contentDescription = null,
-                tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(48.dp)
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(52.dp)
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         Text(
             text = stringResource(R.string.onboarding_storage_title),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Text(
             text = stringResource(R.string.onboarding_storage_subtitle),
@@ -515,17 +586,15 @@ fun Page3StoragePermission(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (hasPermission)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            ),
-            shape = RoundedCornerShape(16.dp)
+            color = if (hasPermission) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -540,29 +609,31 @@ fun Page3StoragePermission(
                         text = if (hasPermission) stringResource(R.string.onboarding_storage_status_active)
                         else stringResource(R.string.onboarding_storage_status_needed),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 if (!hasPermission) {
                     Button(
                         onClick = onRequestPermission,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text(stringResource(R.string.onboarding_storage_btn_allow))
+                        Text(stringResource(R.string.onboarding_storage_btn_allow), fontWeight = FontWeight.Bold)
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedButton(
                         onClick = onOpenSettings,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text(stringResource(R.string.onboarding_storage_btn_settings))
+                        Text(stringResource(R.string.onboarding_storage_btn_settings), fontWeight = FontWeight.SemiBold)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
                     text = stringResource(R.string.onboarding_storage_hint),
@@ -589,34 +660,35 @@ fun Page4NotificationPermission(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-                .background(
-                    if (hasPermission) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.secondaryContainer
-                ),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.size(108.dp),
+            shape = CircleShape,
+            color = if (hasPermission) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+            shadowElevation = 4.dp
         ) {
-            Icon(
-                imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Notifications,
-                contentDescription = null,
-                tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(48.dp)
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Notifications,
+                    contentDescription = null,
+                    tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(52.dp)
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         Text(
             text = stringResource(R.string.onboarding_p4_title),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         Text(
             text = stringResource(R.string.onboarding_p4_subtitle),
@@ -627,17 +699,15 @@ fun Page4NotificationPermission(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = if (hasPermission)
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            ),
-            shape = RoundedCornerShape(16.dp)
+            color = if (hasPermission) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -652,31 +722,33 @@ fun Page4NotificationPermission(
                         text = if (hasPermission) stringResource(R.string.notif_status_active)
                         else stringResource(R.string.notif_status_need_permission),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 if (!hasPermission) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         Button(
                             onClick = onRequestPermission,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text(stringResource(R.string.notif_btn_allow))
+                            Text(stringResource(R.string.notif_btn_allow), fontWeight = FontWeight.Bold)
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                     }
                     OutlinedButton(
                         onClick = onOpenSettings,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text(stringResource(R.string.notif_btn_settings))
+                        Text(stringResource(R.string.notif_btn_settings), fontWeight = FontWeight.SemiBold)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
                     text = stringResource(R.string.notif_denied_hint),
@@ -708,7 +780,7 @@ fun Page5SummaryQuality(
         Text(
             text = stringResource(R.string.onboarding_p5_title),
             style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
         )
 
@@ -721,50 +793,60 @@ fun Page5SummaryQuality(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         // Quality selection card
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            shape = RoundedCornerShape(16.dp)
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(22.dp),
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.HighQuality,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.HighQuality,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = stringResource(R.string.onboarding_p3_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { onQualitySelected("STANDARD") }
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
                         selected = currentQuality == "STANDARD",
                         onClick = { onQualitySelected("STANDARD") }
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
                             text = stringResource(R.string.quality_standard),
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = stringResource(R.string.quality_standard_desc),
@@ -777,21 +859,21 @@ fun Page5SummaryQuality(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { onQualitySelected("HD") }
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
                         selected = currentQuality == "HD",
                         onClick = { onQualitySelected("HD") }
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
                             text = stringResource(R.string.quality_hd),
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = stringResource(R.string.quality_hd_desc),
@@ -806,12 +888,13 @@ fun Page5SummaryQuality(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Summary Card
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)),
-            shape = RoundedCornerShape(16.dp)
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+            shape = RoundedCornerShape(22.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(18.dp)) {
                 val langName = when (preferences.language) {
                     "ID" -> stringResource(R.string.settings_lang_id)
                     "EN" -> stringResource(R.string.settings_lang_en)
@@ -820,7 +903,8 @@ fun Page5SummaryQuality(
 
                 Text(
                     text = stringResource(R.string.summary_language, langName),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
@@ -828,7 +912,8 @@ fun Page5SummaryQuality(
                         R.string.summary_quality,
                         if (currentQuality == "HD") stringResource(R.string.quality_hd) else stringResource(R.string.quality_standard)
                     ),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
@@ -836,7 +921,8 @@ fun Page5SummaryQuality(
                         R.string.summary_storage,
                         if (hasStorage) stringResource(R.string.summary_active) else stringResource(R.string.summary_inactive)
                     ),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
@@ -844,7 +930,8 @@ fun Page5SummaryQuality(
                         R.string.summary_notification,
                         if (hasNotif) stringResource(R.string.summary_active) else stringResource(R.string.summary_inactive)
                     ),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
