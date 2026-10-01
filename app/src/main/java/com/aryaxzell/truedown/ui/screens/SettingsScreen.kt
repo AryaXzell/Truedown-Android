@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
@@ -266,6 +267,26 @@ fun SettingsScreen(
                     testTag = "settings_duplicate_row",
                     iconContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Battery Saver Toggle
+                SettingsSwitchRow(
+                    icon = Icons.Default.BatteryAlert,
+                    title = stringResource(R.string.settings_battery_saver_label),
+                    subtitle = stringResource(R.string.settings_battery_saver_desc),
+                    checked = preferences.batterySaver,
+                    enabled = true,
+                    onCheckedChange = { enabled ->
+                        viewModel.updateBatterySaver(enabled)
+                    },
+                    testTag = "settings_battery_saver_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.errorContainer,
+                    iconTint = MaterialTheme.colorScheme.error
                 )
             }
 

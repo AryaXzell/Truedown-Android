@@ -95,6 +95,8 @@ fun PreviewScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val downloadProgressMap by viewModel.downloadProgress.collectAsState()
+    val preferences by viewModel.preferences.collectAsState()
+    val isBatterySaver = preferences.batterySaver
     val currentProgress = downloadProgressMap[post.id]
 
     val isDownloading = currentProgress?.status == MediaStatus.DOWNLOADING || currentProgress?.status == MediaStatus.PENDING
@@ -165,7 +167,15 @@ fun PreviewScreen(
                             .data(imageUrl)
                             .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                             .addHeader("Referer", "https://www.tiktok.com/")
-                            .crossfade(true)
+                            .apply {
+                                if (isBatterySaver) {
+                                    size(240, 240)
+                                    allowHardware(false)
+                                    crossfade(false)
+                                } else {
+                                    crossfade(true)
+                                }
+                            }
                             .build(),
                         contentDescription = post.title,
                         modifier = Modifier.fillMaxSize(),

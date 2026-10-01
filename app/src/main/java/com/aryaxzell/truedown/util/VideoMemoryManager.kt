@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -56,7 +57,15 @@ object VideoMemoryManager {
                 } catch (e: Exception) {
                     AppLogger.e("MemoryManager", "Failed to check memory usage: ${e.message}")
                 }
-                delay(3000) // Poll every 3 seconds
+                
+                val isBatterySaver = try {
+                    val prefsRepo = com.aryaxzell.truedown.data.preferences.UserPreferencesRepository(context)
+                    prefsRepo.userPreferencesFlow.first().batterySaver
+                } catch (_: Exception) {
+                    false
+                }
+                val pollInterval = if (isBatterySaver) 12000L else 3000L // Reduce background CPU work significantly in battery saver mode
+                delay(pollInterval)
             }
         }
     }

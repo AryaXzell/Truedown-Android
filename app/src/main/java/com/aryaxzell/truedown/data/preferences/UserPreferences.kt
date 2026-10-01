@@ -11,5 +11,6 @@ data class UserPreferences(
     val showNotificationActions: Boolean = true,
     val onboardingCompleted: Boolean = false,
     val developerMode: Boolean = false,
-    val dohProvider: String = "SYSTEM"
+    val dohProvider: String = "SYSTEM",
+    val batterySaver: Boolean = false
 )

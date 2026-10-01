@@ -328,6 +328,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateBatterySaver(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setBatterySaver(enabled)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "Battery saver set to $enabled")
+        }
+    }
+
     fun updateDohProvider(providerKey: String) {
         viewModelScope.launch {
             userPreferencesRepository.setDohProvider(providerKey)

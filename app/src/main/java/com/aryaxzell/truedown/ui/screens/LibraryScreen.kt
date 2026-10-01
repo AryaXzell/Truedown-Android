@@ -120,6 +120,8 @@ fun LibraryScreen(
 
     val allPosts by viewModel.allPosts.collectAsState()
     val downloadProgressMap by viewModel.downloadProgress.collectAsState()
+    val preferences by viewModel.preferences.collectAsState()
+    val isBatterySaver = preferences.batterySaver
     var currentFilter by remember { mutableStateOf(LibraryFilter.ALL) }
 
     var postToDelete by remember { mutableStateOf<PostWithMedia?>(null) }
@@ -315,6 +317,7 @@ fun LibraryScreen(
                         ExpressiveLibraryPostItem(
                             postWithMedia = postWithMedia,
                             downloadProgress = progress,
+                            batterySaver = isBatterySaver,
                             onClick = {
                                 if (currentFilter == LibraryFilter.AUDIO ||
                                     postWithMedia.mediaItems.any { (it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name) && postWithMedia.mediaItems.none { m -> m.kind == "VIDEO" || m.kind == "PHOTO" } }) {
@@ -492,6 +495,7 @@ private fun ExpressiveFilterChip(
 private fun ExpressiveLibraryPostItem(
     postWithMedia: PostWithMedia,
     downloadProgress: DownloadProgress? = null,
+    batterySaver: Boolean = false,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onShareClick: () -> Unit
@@ -550,7 +554,16 @@ private fun ExpressiveLibraryPostItem(
                     ) {
                         if (!thumbnailUri.isNullOrBlank()) {
                             AsyncImage(
-                                model = thumbnailUri,
+                                model = if (batterySaver) {
+                                    coil.request.ImageRequest.Builder(context)
+                                        .data(thumbnailUri)
+                                        .size(100, 100)
+                                        .allowHardware(false)
+                                        .crossfade(false)
+                                        .build()
+                                } else {
+                                    thumbnailUri
+                                },
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop

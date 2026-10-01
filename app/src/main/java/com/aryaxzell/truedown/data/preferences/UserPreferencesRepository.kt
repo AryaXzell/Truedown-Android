@@ -26,6 +26,7 @@ class UserPreferencesRepository(private val context: Context) {
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")
         val KEY_DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
         val KEY_DOH_PROVIDER = stringPreferencesKey("doh_provider")
+        val KEY_BATTERY_SAVER = booleanPreferencesKey("battery_saver")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
@@ -40,7 +41,8 @@ class UserPreferencesRepository(private val context: Context) {
             showNotificationActions = preferences[KEY_NOTIF_ACTIONS] ?: true,
             onboardingCompleted = preferences[KEY_ONBOARDING] ?: false,
             developerMode = preferences[KEY_DEVELOPER_MODE] ?: false,
-            dohProvider = preferences[KEY_DOH_PROVIDER] ?: "SYSTEM"
+            dohProvider = preferences[KEY_DOH_PROVIDER] ?: "SYSTEM",
+            batterySaver = preferences[KEY_BATTERY_SAVER] ?: false
         )
     }
 
@@ -86,5 +88,9 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setDohProvider(provider: String) {
         context.dataStore.edit { it[KEY_DOH_PROVIDER] = provider }
+    }
+
+    suspend fun setBatterySaver(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_BATTERY_SAVER] = enabled }
     }
 }
