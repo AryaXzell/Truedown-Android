@@ -24,6 +24,8 @@ class UserPreferencesRepository(private val context: Context) {
         val KEY_DUPLICATE = stringPreferencesKey("duplicate_rule")
         val KEY_NOTIF_ACTIONS = booleanPreferencesKey("notif_actions")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_completed")
+        val KEY_DEVELOPER_MODE = booleanPreferencesKey("developer_mode")
+        val KEY_DOH_PROVIDER = stringPreferencesKey("doh_provider")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
@@ -36,7 +38,9 @@ class UserPreferencesRepository(private val context: Context) {
             qualityFallback = preferences[KEY_FALLBACK] ?: "AUTO",
             duplicateRule = preferences[KEY_DUPLICATE] ?: "SKIP",
             showNotificationActions = preferences[KEY_NOTIF_ACTIONS] ?: true,
-            onboardingCompleted = preferences[KEY_ONBOARDING] ?: false
+            onboardingCompleted = preferences[KEY_ONBOARDING] ?: false,
+            developerMode = preferences[KEY_DEVELOPER_MODE] ?: false,
+            dohProvider = preferences[KEY_DOH_PROVIDER] ?: "SYSTEM"
         )
     }
 
@@ -74,5 +78,13 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
         context.dataStore.edit { it[KEY_ONBOARDING] = completed }
+    }
+
+    suspend fun setDeveloperMode(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_DEVELOPER_MODE] = enabled }
+    }
+
+    suspend fun setDohProvider(provider: String) {
+        context.dataStore.edit { it[KEY_DOH_PROVIDER] = provider }
     }
 }

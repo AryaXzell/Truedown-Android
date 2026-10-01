@@ -27,9 +27,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Info
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -97,6 +100,8 @@ fun SettingsScreen(
     var showQualityDialog by remember { mutableStateOf(false) }
     var showFallbackDialog by remember { mutableStateOf(false) }
     var showDuplicateDialog by remember { mutableStateOf(false) }
+    var showDohDialog by remember { mutableStateOf(false) }
+    var showDeveloperLogsDialog by remember { mutableStateOf(false) }
 
     BackHandler {
         onBack()
@@ -367,6 +372,54 @@ fun SettingsScreen(
                     iconContainerColor = MaterialTheme.colorScheme.errorContainer,
                     iconTint = MaterialTheme.colorScheme.error
                 )
+            }
+
+            // Card: Jaringan & DNS (DoH)
+            SettingsGroupCard(title = "Jaringan & DNS") {
+                val currentDohName = com.aryaxzell.truedown.util.DohProvider.fromKey(preferences.dohProvider).displayName
+                SettingsClickableRow(
+                    icon = Icons.Default.Dns,
+                    title = "DNS over HTTPS (DoH)",
+                    subtitle = "Provider aktif: $currentDohName",
+                    onClick = { showDohDialog = true },
+                    testTag = "settings_doh_row",
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconTint = MaterialTheme.colorScheme.tertiary
+                )
+            }
+
+            // Card: Opsi Developer
+            SettingsGroupCard(title = "Opsi Developer") {
+                SettingsSwitchRow(
+                    icon = Icons.Default.BugReport,
+                    title = "Mode Developer",
+                    subtitle = if (preferences.developerMode) "Aktif — Akses log aplikasi terbuka" else "Nonaktifkan fitur debugging",
+                    checked = preferences.developerMode,
+                    enabled = true,
+                    onCheckedChange = { enabled ->
+                        viewModel.updateDeveloperMode(enabled)
+                    },
+                    testTag = "settings_developer_mode_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
+                )
+
+                if (preferences.developerMode) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    )
+
+                    SettingsClickableRow(
+                        icon = Icons.Default.Terminal,
+                        title = "Log Aplikasi (Logs)",
+                        subtitle = "Buka riwayat log aplikasi secara detail",
+                        onClick = { showDeveloperLogsDialog = true },
+                        testTag = "settings_logs_row",
+                        iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        iconTint = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
 
             // Card 5: Tentang
@@ -774,6 +827,80 @@ fun SettingsScreen(
                     Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
                 }
             }
+        )
+    }
+
+    // DoH Dialog
+    if (showDohDialog) {
+        val providers = listOf(
+            com.aryaxzell.truedown.util.DohProvider.SYSTEM,
+            com.aryaxzell.truedown.util.DohProvider.CLOUDFLARE,
+            com.aryaxzell.truedown.util.DohProvider.GOOGLE,
+            com.aryaxzell.truedown.util.DohProvider.ADGUARD
+        )
+        AlertDialog(
+            onDismissRequest = { showDohDialog = false },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = "Pilih DNS over HTTPS (DoH)",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Amankan dan percepat resolusi domain menggunakan protokol DoH terenkripsi.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    providers.forEach { provider ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    viewModel.updateDohProvider(provider.key)
+                                    showDohDialog = false
+                                }
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = preferences.dohProvider.equals(provider.key, ignoreCase = true),
+                                onClick = {
+                                    viewModel.updateDohProvider(provider.key)
+                                    showDohDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = provider.displayName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { showDohDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_close), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
+    }
+
+    // Developer Logs Dialog
+    if (showDeveloperLogsDialog) {
+        com.aryaxzell.truedown.ui.components.DeveloperLogsDialog(
+            onDismiss = { showDeveloperLogsDialog = false }
         )
     }
 }

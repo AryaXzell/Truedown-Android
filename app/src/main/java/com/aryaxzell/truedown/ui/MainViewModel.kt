@@ -105,6 +105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (!prefs.onboardingCompleted && !isShareIntent) {
                 _screenStack.value = listOf(AppScreen.Onboarding)
             }
+            (downloadProvider as? TikWmDownloadProvider)?.updateDohProvider(prefs.dohProvider)
             _startupReady.value = true
         }
     }
@@ -318,5 +319,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             userPreferencesRepository.setShowNotificationActions(enabled)
         }
+    }
+
+    fun updateDeveloperMode(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setDeveloperMode(enabled)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "Developer mode set to $enabled")
+        }
+    }
+
+    fun updateDohProvider(providerKey: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setDohProvider(providerKey)
+            (downloadProvider as? TikWmDownloadProvider)?.updateDohProvider(providerKey)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "DNS over HTTPS provider changed to $providerKey")
+        }
+    }
+
+    fun clearLogs() {
+        com.aryaxzell.truedown.util.AppLogger.clear()
     }
 }

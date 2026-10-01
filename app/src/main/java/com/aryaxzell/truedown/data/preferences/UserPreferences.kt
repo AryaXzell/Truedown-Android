@@ -9,5 +9,7 @@ data class UserPreferences(
     val qualityFallback: String = "AUTO",
     val duplicateRule: String = "SKIP",
     val showNotificationActions: Boolean = true,
-    val onboardingCompleted: Boolean = false
+    val onboardingCompleted: Boolean = false,
+    val developerMode: Boolean = false,
+    val dohProvider: String = "SYSTEM"
 )

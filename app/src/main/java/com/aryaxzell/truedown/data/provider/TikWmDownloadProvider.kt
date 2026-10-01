@@ -3,6 +3,8 @@ package com.aryaxzell.truedown.data.provider
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
+import com.aryaxzell.truedown.util.AppLogger
+import com.aryaxzell.truedown.util.DohDns
 import com.aryaxzell.truedown.util.UrlExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,11 +22,26 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class TikWmDownloadProvider(
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private var dohProviderKey: String = "SYSTEM"
 ) : DownloadProvider {
+
+    private fun buildClient(providerKey: String): OkHttpClient {
+        return OkHttpClient.Builder()
+            .dns(DohDns(providerKey))
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private var client: OkHttpClient = buildClient(dohProviderKey)
+
+    fun updateDohProvider(providerKey: String) {
+        if (dohProviderKey != providerKey) {
+            dohProviderKey = providerKey
+            client = buildClient(providerKey)
+            AppLogger.i("TikWmProvider", "Updated OkHttpClient DoH provider to: $providerKey")
+        }
+    }
 
     data class CachedEntry(val post: ResolvedPost, val timestamp: Long)
 
@@ -48,13 +65,17 @@ class TikWmDownloadProvider(
 
     override suspend fun resolve(url: String): Result<ResolvedPost> {
         val cleanUrl = UrlExtractor.extractFirstUrl(url) ?: UrlExtractor.cleanCandidate(url)
+        AppLogger.i("TikWmProvider", "Resolving URL: $cleanUrl")
         val validation = validateTikTokUrl(cleanUrl)
         if (validation.isFailure) {
-            return Result.failure(validation.exceptionOrNull() ?: ProviderError.InvalidLink)
+            val err = validation.exceptionOrNull() ?: ProviderError.InvalidLink
+            AppLogger.w("TikWmProvider", "Validation failed for $cleanUrl: ${err.message}")
+            return Result.failure(err)
         }
 
         val cached = getCached(cleanUrl)
         if (cached != null) {
+            AppLogger.d("TikWmProvider", "Loaded from memory cache: ${cached.id}")
             return Result.success(cached)
         }
 
