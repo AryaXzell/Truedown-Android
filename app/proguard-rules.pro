@@ -46,6 +46,6 @@
 }
 
 # Keep Data Entities and Models
--keep class com.example.data.local.** { *; }
--keep class com.example.domain.model.** { *; }
--keep class com.example.data.preferences.** { *; }
+-keep class com.aryaxzell.truedown.data.local.** { *; }
+-keep class com.aryaxzell.truedown.domain.model.** { *; }
+-keep class com.aryaxzell.truedown.data.preferences.** { *; }

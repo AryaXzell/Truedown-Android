@@ -98,6 +98,8 @@
     <string name="preview_downloading">Downloading…</string>
     <string name="preview_already_downloaded">Already downloaded</string>
     <string name="preview_starting_download">Starting download…</string>
+    <string name="download_progress_format">Downloading… %1$d%%</string>
+    <string name="download_completed_label">Download Completed</string>
 
     <!-- Library Screen -->
     <string name="library_title">Library</string>

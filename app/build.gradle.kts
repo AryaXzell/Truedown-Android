@@ -33,11 +33,11 @@ val dynamicBaseVersionCode = (baseVersionCode * 100000) + dynamicBuildNumber
 val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2)
 
 android {
-    namespace = "com.example"
+    namespace = "com.aryaxzell.truedown"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.aistudio.truedown.kxmpzq"
+        applicationId = "com.aryaxzell.truedown"
         minSdk = 29
         targetSdk = 35
         versionCode = (dynamicBaseVersionCode * 10) // default universal (code 0)
@@ -152,6 +152,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -159,6 +160,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
     implementation(libs.coil.compose)
+    implementation(libs.coil.video)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)

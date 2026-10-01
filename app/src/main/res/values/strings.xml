@@ -98,6 +98,8 @@
     <string name="preview_downloading">Sedang diunduh…</string>
     <string name="preview_already_downloaded">Sudah diunduh</string>
     <string name="preview_starting_download">Mulai mengunduh…</string>
+    <string name="download_progress_format">Mengunduh… %1$d%%</string>
+    <string name="download_completed_label">Unduhan Selesai</string>
 
     <!-- Library Screen -->
     <string name="library_title">Library</string>
