@@ -1,6 +1,8 @@
 package com.aryaxzell.truedown
 
 import android.app.Application
+import android.content.Intent
+import com.aryaxzell.truedown.service.RamMonitorService
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
@@ -9,6 +11,16 @@ import coil.memory.MemoryCache
 import okhttp3.OkHttpClient
 
 class TruedownApp : Application(), ImageLoaderFactory {
+
+    override fun onCreate() {
+        super.onCreate()
+        try {
+            val serviceIntent = Intent(this, RamMonitorService::class.java)
+            startService(serviceIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     override fun newImageLoader(): ImageLoader {
         val okHttpClient = OkHttpClient.Builder()

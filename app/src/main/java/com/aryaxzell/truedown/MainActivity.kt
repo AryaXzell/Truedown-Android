@@ -12,8 +12,10 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -180,30 +182,11 @@ fun MainAppContent(
                     stiffness = Spring.StiffnessMediumLow
                 )
 
-                if (initialState is AppScreen.Home && targetState is AppScreen.Library) {
-                    // Material Design 3 Container Transform Expansion: Main Downloader -> Gallery / Library View
-                    (scaleIn(
-                        initialScale = 0.90f,
-                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
-                    ) + fadeIn(animationSpec = enterSpec))
-                        .togetherWith(
-                            scaleOut(
-                                targetScale = 1.05f,
-                                animationSpec = exitSpec
-                            ) + fadeOut(animationSpec = exitSpec)
-                        )
-                } else if (initialState is AppScreen.Library && targetState is AppScreen.Home) {
-                    // Material Design 3 Container Transform Collapse: Gallery / Library View -> Main Downloader
-                    (scaleIn(
-                        initialScale = 1.05f,
-                        animationSpec = enterSpec
-                    ) + fadeIn(animationSpec = enterSpec))
-                        .togetherWith(
-                            scaleOut(
-                                targetScale = 0.90f,
-                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
-                            ) + fadeOut(animationSpec = exitSpec)
-                        )
+                if ((initialState is AppScreen.Home && targetState is AppScreen.Library) ||
+                    (initialState is AppScreen.Library && targetState is AppScreen.Home)) {
+                    // Fast crossfade for main tab navigation
+                    fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing))
+                        .togetherWith(fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing)))
                 } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings) {
                     // Container Transform Scale & Fade expansion into detail / preview / players
                     (scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)) +

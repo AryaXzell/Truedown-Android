@@ -60,11 +60,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.data.local.PostWithMedia
 import com.aryaxzell.truedown.domain.model.MediaKind
+import com.aryaxzell.truedown.util.AppLogger
+import com.aryaxzell.truedown.util.VideoMemoryManager
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
@@ -86,26 +89,39 @@ fun BuiltInVideoPlayerScreen(
     var isLandscape by remember { mutableStateOf(false) }
 
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
-            if (uriString.isNotBlank()) {
-                val mediaItem = MediaItem.fromUri(Uri.parse(uriString))
-                setMediaItem(mediaItem)
-                repeatMode = Player.REPEAT_MODE_ALL
-                prepare()
-                playWhenReady = true
-            }
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    isPlaying = playing
-                }
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                1500, // minBufferMs
+                8000, // maxBufferMs
+                500,  // bufferForPlaybackMs
+                1000  // bufferForPlaybackAfterRebufferMs
+            )
+            .setTargetBufferBytes(12 * 1024 * 1024) // 12MB target buffer ceiling
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
 
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState == Player.STATE_READY) {
-                        duration = this@apply.duration.coerceAtLeast(1L)
-                    }
+        ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .build().apply {
+                if (uriString.isNotBlank()) {
+                    val mediaItem = MediaItem.fromUri(Uri.parse(uriString))
+                    setMediaItem(mediaItem)
+                    repeatMode = Player.REPEAT_MODE_ALL
+                    prepare()
+                    playWhenReady = true
                 }
-            })
-        }
+                addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(playing: Boolean) {
+                        isPlaying = playing
+                    }
+
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            duration = this@apply.duration.coerceAtLeast(1L)
+                        }
+                    }
+                })
+            }
     }
 
     LaunchedEffect(exoPlayer) {
@@ -125,8 +141,16 @@ fun BuiltInVideoPlayerScreen(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(exoPlayer) {
+        val trimListener = {
+            try {
+                AppLogger.w("VideoPlayer", "RAM limit reached (>180MB). Trimming ExoPlayer video buffers.")
+            } catch (_: Exception) {}
+        }
+        VideoMemoryManager.registerTrimListener(trimListener)
+
         onDispose {
+            VideoMemoryManager.unregisterTrimListener(trimListener)
             exoPlayer.release()
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }

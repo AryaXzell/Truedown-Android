@@ -5,7 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -108,15 +110,16 @@ fun DeveloperLogsDialog(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
+                            val ramMb by com.aryaxzell.truedown.util.VideoMemoryManager.currentRamUsageMb.collectAsState()
                             Text(
                                 text = "Developer Logs",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold
                             )
                             Text(
-                                text = "${logs.size} Log Terdeteksi",
+                                text = "${logs.size} Log • RAM: ${ramMb}MB / 200MB",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (ramMb >= 180) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -131,21 +134,21 @@ fun DeveloperLogsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Action Bar: Copy, Clear, Filter
+                // Action Bar: Scrollable Filters
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val filterOptions = listOf("ALL", "DEBUG", "INFO", "WARN", "ERROR")
-                        filterOptions.forEach { level ->
-                            FilterChip(
-                                selected = selectedLevelFilter == level,
-                                onClick = { selectedLevelFilter = level },
-                                label = { Text(level, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                            )
-                        }
+                    val filterOptions = listOf("ALL", "DEBUG", "INFO", "WARN", "ERROR")
+                    filterOptions.forEach { level ->
+                        FilterChip(
+                            selected = selectedLevelFilter == level,
+                            onClick = { selectedLevelFilter = level },
+                            label = { Text(level, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                        )
                     }
                 }
 

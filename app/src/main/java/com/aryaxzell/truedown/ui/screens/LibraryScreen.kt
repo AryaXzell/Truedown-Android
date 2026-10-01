@@ -306,7 +306,11 @@ fun LibraryScreen(
                         }
                     }
 
-                    items(filteredPosts, key = { it.post.id }) { postWithMedia ->
+                    items(
+                        items = filteredPosts,
+                        key = { it.post.id },
+                        contentType = { it.post.type }
+                    ) { postWithMedia ->
                         val progress = downloadProgressMap[postWithMedia.post.id]
                         ExpressiveLibraryPostItem(
                             postWithMedia = postWithMedia,
@@ -499,8 +503,8 @@ private fun ExpressiveLibraryPostItem(
             downloadProgress?.status == MediaStatus.PENDING ||
             postWithMedia.mediaItems.any { it.status == MediaStatus.DOWNLOADING.name || it.status == MediaStatus.PENDING.name }
 
-    val firstMedia = postWithMedia.mediaItems.firstOrNull()
-    val thumbnailUri = firstMedia?.mediaStoreUri
+    val firstMedia = postWithMedia.mediaItems.firstOrNull { it.mediaStoreUri.isNotBlank() } ?: postWithMedia.mediaItems.firstOrNull()
+    val thumbnailUri = firstMedia?.mediaStoreUri?.ifBlank { null }
 
     val dateFormatted = remember(postWithMedia.post.createdAt) {
         val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
@@ -527,7 +531,6 @@ private fun ExpressiveLibraryPostItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .animateContentSize()
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -547,12 +550,7 @@ private fun ExpressiveLibraryPostItem(
                     ) {
                         if (!thumbnailUri.isNullOrBlank()) {
                             AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(thumbnailUri)
-                                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                                    .addHeader("Referer", "https://www.tiktok.com/")
-                                    .crossfade(true)
-                                    .build(),
+                                model = thumbnailUri,
                                 contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
