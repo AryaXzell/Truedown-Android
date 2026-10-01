@@ -280,14 +280,26 @@ fun MainAppContent(
                     PreviewScreen(
                         post = screen.post,
                         viewModel = viewModel,
-                        onBack = { viewModel.popBackStack() }
+                        onBack = {
+                            viewModel.resetResolveState()
+                            val popped = viewModel.popBackStack()
+                            if (!popped) {
+                                viewModel.navigateTo(AppScreen.Home)
+                            }
+                        }
                     )
                 }
                 is AppScreen.SlideshowGrid -> {
                     SlideshowGridScreen(
                         post = screen.post,
                         viewModel = viewModel,
-                        onBack = { viewModel.popBackStack() },
+                        onBack = {
+                            viewModel.resetResolveState()
+                            val popped = viewModel.popBackStack()
+                            if (!popped) {
+                                viewModel.navigateTo(AppScreen.Home)
+                            }
+                        },
                         onOpenPhotoViewer = { index ->
                             viewModel.navigateTo(AppScreen.PhotoViewer(screen.post, index))
                         }

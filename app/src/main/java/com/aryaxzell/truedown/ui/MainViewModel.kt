@@ -160,6 +160,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (screen is AppScreen.Home) {
             _screenStack.value = listOf(AppScreen.Home)
         } else {
+            // Prevent pushing identical screen onto the stack
+            if (currentList.lastOrNull() == screen) {
+                return
+            }
+            // If already on a Preview screen, replace the top screen instead of accumulating duplicate screens
+            if (screen is AppScreen.Preview && currentList.lastOrNull() is AppScreen.Preview) {
+                currentList[currentList.lastIndex] = screen
+                _screenStack.value = currentList
+                return
+            }
+            if (screen is AppScreen.SlideshowGrid && currentList.lastOrNull() is AppScreen.SlideshowGrid) {
+                currentList[currentList.lastIndex] = screen
+                _screenStack.value = currentList
+                return
+            }
             currentList.add(screen)
             _screenStack.value = currentList
         }
@@ -171,9 +186,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentList.removeAt(currentList.lastIndex)
             _screenStack.value = currentList
             return true
+        } else if (currentList.firstOrNull() !is AppScreen.Home) {
+            _screenStack.value = listOf(AppScreen.Home)
+            return true
         }
         return false
     }
+
+    private var lastHandledClipboardUrl: String? = null
 
     fun checkClipboardForTikTokUrl(context: Context) {
         try {
@@ -185,7 +205,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val item = clipboard.primaryClip?.getItemAt(0)
                     val text = item?.text?.toString()?.trim() ?: ""
                     if (isTikTokUrl(text)) {
-                        _detectedClipboardUrl.value = text
+                        // Avoid repeatedly auto-triggering on the exact same clipboard URL once consumed or dismissed
+                        if (text != lastHandledClipboardUrl) {
+                            _detectedClipboardUrl.value = text
+                        }
                         return
                     }
                 }
@@ -197,7 +220,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearDetectedClipboardUrl() {
+        val current = _detectedClipboardUrl.value
+        if (!current.isNullOrBlank()) {
+            lastHandledClipboardUrl = current
+        }
         _detectedClipboardUrl.value = null
+    }
+
+    fun markClipboardUrlHandled(url: String) {
+        val clean = extractUrl(url)
+        lastHandledClipboardUrl = if (clean.isNotBlank()) clean else url
+        if (_detectedClipboardUrl.value == url || _detectedClipboardUrl.value == clean) {
+            _detectedClipboardUrl.value = null
+        }
     }
 
     private fun isTikTokUrl(text: String): Boolean {
@@ -219,6 +254,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resolveUrl(url: String, onNavigate: ((AppScreen) -> Unit)? = null) {
+        markClipboardUrlHandled(url)
         val cleanUrl = extractUrl(url)
         if (cleanUrl.isBlank() || !isTikTokUrl(cleanUrl)) {
             _resolveState.value = ResolveState.Error(com.aryaxzell.truedown.R.string.error_invalid_link)
