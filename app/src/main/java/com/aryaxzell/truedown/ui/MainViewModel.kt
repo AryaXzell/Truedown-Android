@@ -227,6 +227,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { enqueueDownload(post, downloadMp3Only, selectedPhotoIndices) }
     }
 
+    fun cancelDownload(postId: String) {
+        downloadScheduler.cancelDownload(postId)
+    }
+
     fun deletePost(postWithMedia: PostWithMedia, deleteFromGallery: Boolean) {
         viewModelScope.launch {
             if (deleteFromGallery) {

@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.secrets.gradle.plugin)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 val releaseKeystorePath = System.getenv("KEYSTORE_FILE") ?: ""
@@ -133,6 +134,12 @@ android {
         includeInApk = false
         includeInBundle = true
     }
+
+    baselineProfile {
+        filter {
+            include("com.aryaxzell.truedown.**")
+        }
+    }
 }
 
 secrets {
@@ -172,6 +179,7 @@ dependencies {
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp)
     implementation(libs.retrofit)
+    implementation(libs.androidx.profileinstaller)
 
     ksp(libs.androidx.room.compiler)
     ksp(libs.moshi.kotlin.codegen)

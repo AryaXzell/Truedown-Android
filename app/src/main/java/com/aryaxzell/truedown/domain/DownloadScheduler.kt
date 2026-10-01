@@ -215,10 +215,17 @@ class DownloadScheduler(private val context: Context) {
         val workRequest = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(inputData)
             .setConstraints(constraints)
+            .addTag("post_${post.id}")
+            .addTag("download")
             .build()
 
         val uniqueWorkName = "download_${post.id}_${kind.name}_$index"
         workManager.enqueueUniqueWork(uniqueWorkName, ExistingWorkPolicy.KEEP, workRequest)
+    }
+
+    fun cancelDownload(postId: String) {
+        workManager.cancelAllWorkByTag("post_$postId")
+        com.aryaxzell.truedown.domain.DownloadProgressTracker.clear(postId)
     }
 
     suspend fun deletePost(postId: String, deleteFromGallery: Boolean): Boolean = withContext(Dispatchers.IO) {

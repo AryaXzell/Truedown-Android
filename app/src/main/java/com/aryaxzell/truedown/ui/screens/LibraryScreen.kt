@@ -62,6 +62,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -321,43 +324,83 @@ fun LibraryScreen(
                         contentType = { it.post.type }
                     ) { postWithMedia ->
                         val progress = downloadProgressMap[postWithMedia.post.id]
-                        ExpressiveLibraryPostItem(
-                            postWithMedia = postWithMedia,
-                            downloadProgress = progress,
-                            batterySaver = isBatterySaver,
-                            onClick = {
-                                if (currentFilter == LibraryFilter.AUDIO ||
-                                    postWithMedia.mediaItems.any { (it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name) && postWithMedia.mediaItems.none { m -> m.kind == "VIDEO" || m.kind == "PHOTO" } }) {
-                                    onOpenAudioPlayer(postWithMedia)
-                                } else if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
-                                    onOpenVideoPlayer(postWithMedia)
-                                } else {
-                                    onOpenSlideshow(postWithMedia)
-                                }
-                            },
-                            onDeleteClick = {
-                                postToDelete = postWithMedia
-                                deleteFromGallery = false
-                            },
-                            onShareClick = {
-                                val firstItem = postWithMedia.mediaItems.firstOrNull { it.status == "DONE" || it.status == MediaStatus.DONE.name }
-                                firstItem?.let { item ->
-                                    if (item.mediaStoreUri.isNotBlank()) {
-                                        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                            type = if (item.kind == "VIDEO" || item.kind == MediaKind.VIDEO.name) "video/*"
-                                            else if (item.kind == "PHOTO" || item.kind == MediaKind.PHOTO.name) "image/*"
-                                            else "audio/*"
-                                            putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        context.startActivity(Intent.createChooser(sendIntent, "Bagikan"))
+                        
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { dismissValue ->
+                                if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                                    val isDownloading = progress != null && (progress.status == MediaStatus.DOWNLOADING || progress.status == MediaStatus.PENDING)
+                                    if (isDownloading) {
+                                        viewModel.cancelDownload(postWithMedia.post.id)
+                                    } else {
+                                        viewModel.deletePost(postWithMedia, deleteFromGallery = false)
                                     }
+                                    true
+                                } else {
+                                    false
                                 }
-                            },
-                            onRetryClick = {
-                                viewModel.retryFailedDownload(postWithMedia)
                             }
                         )
+
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            backgroundContent = {
+                                val color = MaterialTheme.colorScheme.errorContainer
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(color, shape = RoundedCornerShape(24.dp))
+                                        .padding(horizontal = 24.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            },
+                            enableDismissFromStartToEnd = false,
+                            enableDismissFromEndToStart = true
+                        ) {
+                            ExpressiveLibraryPostItem(
+                                postWithMedia = postWithMedia,
+                                downloadProgress = progress,
+                                batterySaver = isBatterySaver,
+                                onClick = {
+                                    if (currentFilter == LibraryFilter.AUDIO ||
+                                        postWithMedia.mediaItems.any { (it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name) && postWithMedia.mediaItems.none { m -> m.kind == "VIDEO" || m.kind == "PHOTO" } }) {
+                                        onOpenAudioPlayer(postWithMedia)
+                                    } else if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
+                                        onOpenVideoPlayer(postWithMedia)
+                                    } else {
+                                        onOpenSlideshow(postWithMedia)
+                                    }
+                                },
+                                onDeleteClick = {
+                                    postToDelete = postWithMedia
+                                    deleteFromGallery = false
+                                },
+                                onShareClick = {
+                                    val firstItem = postWithMedia.mediaItems.firstOrNull { it.status == "DONE" || it.status == MediaStatus.DONE.name }
+                                    firstItem?.let { item ->
+                                        if (item.mediaStoreUri.isNotBlank()) {
+                                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                                type = if (item.kind == "VIDEO" || item.kind == MediaKind.VIDEO.name) "video/*"
+                                                else if (item.kind == "PHOTO" || item.kind == MediaKind.PHOTO.name) "image/*"
+                                                else "audio/*"
+                                                putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, "Bagikan"))
+                                        }
+                                    }
+                                },
+                                onRetryClick = {
+                                    viewModel.retryFailedDownload(postWithMedia)
+                                }
+                            )
+                        }
                     }
                 }
             }
