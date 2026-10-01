@@ -140,35 +140,12 @@ class MainActivity : ComponentActivity() {
         if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {
             val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
             if (sharedText.isNotBlank()) {
-                Toast.makeText(this, getString(R.string.home_checking_link), Toast.LENGTH_SHORT).show()
-                lifecycleScope.launch {
-                    val urlText = UrlExtractor.extractFirstUrl(sharedText) ?: sharedText.trim()
-                    val result = viewModel.downloadProvider.resolve(urlText)
-                    val resolvedPost = result.getOrNull()
-                    if (resolvedPost == null) {
-                        val error = result.exceptionOrNull() ?: Exception()
-                        val resId = viewModel.errorResIdFor(error)
-                        // TEMPORARY DEBUG: hapus setelah pemilik repo mengonfirmasi share berfungsi.
-                        val detail = if (error is ProviderError.InvalidLink || error is ProviderError.NotTikTokLink) {
-                            "\n[debug] " + urlText.take(120)
-                        } else ""
-                        Toast.makeText(this@MainActivity, getString(resId) + detail, Toast.LENGTH_LONG).show()
-                        return@launch
-                    }
-
-                    if (resolvedPost.type == PostType.SLIDESHOW && resolvedPost.photoUrls.size > 1) {
-                        viewModel.navigateTo(AppScreen.SlideshowGrid(resolvedPost))
-                    } else {
-                        val enqueue = viewModel.enqueueDownload(resolvedPost, downloadMp3Only = false)
-                        if (enqueue.isSuccess) {
-                            Toast.makeText(this@MainActivity, getString(R.string.preview_starting_download), Toast.LENGTH_SHORT).show()
-                            finish()
-                        } else {
-                            Toast.makeText(this@MainActivity, getString(R.string.error_unknown), Toast.LENGTH_LONG).show()
-                        }
-                    }
+                val urlText = UrlExtractor.extractFirstUrl(sharedText) ?: UrlExtractor.cleanCandidate(sharedText)
+                if (urlText.isNotBlank()) {
+                    Toast.makeText(this, getString(R.string.home_checking_link), Toast.LENGTH_SHORT).show()
+                    viewModel.resolveUrl(urlText)
+                    return true
                 }
-                return true
             }
         }
         return false

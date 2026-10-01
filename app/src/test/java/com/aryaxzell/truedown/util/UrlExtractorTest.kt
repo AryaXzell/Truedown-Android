@@ -47,4 +47,11 @@ class UrlExtractorTest {
         val result = UrlExtractor.extractFirstUrl(input)
         assertEquals("https://www.douyin.com/video/123", result)
     }
+
+    @Test
+    fun testExtractFirstUrl_tiktokShareIntentWithUnicodeMarks() {
+        val input = "Lihat video seru ini di TikTok! https://vt.tiktok.com/ZS123456/\u200E #fyp"
+        val result = UrlExtractor.extractFirstUrl(input)
+        assertEquals("https://vt.tiktok.com/ZS123456/", result)
+    }
 }

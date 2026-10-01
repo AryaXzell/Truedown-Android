@@ -3,9 +3,11 @@ package com.aryaxzell.truedown.data.provider
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
+import com.aryaxzell.truedown.util.UrlExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -38,12 +40,12 @@ class TikWmDownloadProvider(
     }
 
     override suspend fun resolve(url: String): Result<ResolvedPost> {
-        val validation = validateTikTokUrl(url)
+        val cleanUrl = UrlExtractor.extractFirstUrl(url) ?: UrlExtractor.cleanCandidate(url)
+        val validation = validateTikTokUrl(cleanUrl)
         if (validation.isFailure) {
             return Result.failure(validation.exceptionOrNull() ?: ProviderError.InvalidLink)
         }
 
-        val cleanUrl = url.trim()
         val cached = getCached(cleanUrl)
         if (cached != null) {
             return Result.success(cached)
@@ -169,13 +171,15 @@ class TikWmDownloadProvider(
         }
     }
 
-    private fun validateTikTokUrl(url: String): Result<Unit> {
+    private fun validateTikTokUrl(rawUrl: String): Result<Unit> {
+        val url = UrlExtractor.extractFirstUrl(rawUrl) ?: UrlExtractor.cleanCandidate(rawUrl)
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             return Result.failure(ProviderError.InvalidLink)
         }
         return try {
-            val uri = URI(url)
-            val host = uri.host?.lowercase(Locale.ROOT) ?: return Result.failure(ProviderError.InvalidLink)
+            val host = url.toHttpUrlOrNull()?.host?.lowercase(Locale.ROOT)
+                ?: URI(url).host?.lowercase(Locale.ROOT)
+                ?: return Result.failure(ProviderError.InvalidLink)
             if (host.contains("douyin.com")) {
                 Result.failure(ProviderError.DouyinUnsupported)
             } else if (host == "tiktok.com" || host.endsWith(".tiktok.com")) {
