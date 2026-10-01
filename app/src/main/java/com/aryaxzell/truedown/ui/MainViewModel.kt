@@ -23,6 +23,7 @@ import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
 import com.aryaxzell.truedown.util.UrlExtractor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,9 +31,18 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class GlobalDownloadStatus(
+    val hasActiveDownloads: Boolean = false,
+    val activeCount: Int = 0,
+    val progressPercent: Int = 0,
+    val isIndeterminate: Boolean = true,
+    val latestTitle: String = ""
+)
 
 sealed class ResolveState {
     object Idle : ResolveState()
@@ -82,6 +92,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val downloadProgress: StateFlow<Map<String, DownloadProgress>> = DownloadProgressTracker.downloadProgressMap
+
+    private val workManager = androidx.work.WorkManager.getInstance(application)
+
+    val globalDownloadStatus: StateFlow<GlobalDownloadStatus> = combine(
+        workManager.getWorkInfosByTagFlow("download"),
+        downloadProgress
+    ) { workInfos, progressMap ->
+        val activeWorkInfos = workInfos.filter {
+            it.state == androidx.work.WorkInfo.State.RUNNING || it.state == androidx.work.WorkInfo.State.ENQUEUED
+        }
+        val activeProgresses = progressMap.values.filter {
+            it.status == MediaStatus.DOWNLOADING || it.status == MediaStatus.PENDING
+        }
+
+        val isActive = activeWorkInfos.isNotEmpty() || activeProgresses.isNotEmpty()
+        val count = maxOf(activeWorkInfos.size, activeProgresses.size)
+
+        if (!isActive) {
+            GlobalDownloadStatus()
+        } else {
+            val validPercents = activeProgresses.map { it.progressPercent }.filter { it > 0 }
+            val avgPercent = if (validPercents.isNotEmpty()) validPercents.average().toInt() else 0
+            val latestTitle = activeProgresses.lastOrNull()?.title ?: ""
+            val isIndeterminate = avgPercent <= 0
+
+            GlobalDownloadStatus(
+                hasActiveDownloads = true,
+                activeCount = count,
+                progressPercent = avgPercent,
+                isIndeterminate = isIndeterminate,
+                latestTitle = latestTitle
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GlobalDownloadStatus())
 
     init {
         // Reconcile stuck DOWNLOADING items on startup asynchronously on IO thread
@@ -206,6 +250,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return UrlExtractor.extractFirstUrl(input) ?: input.trim()
     }
 
+    fun resetResolveState() {
+        _resolveState.value = ResolveState.Idle
+    }
+
     /** Menjadwalkan download dan menunggu sampai masuk antrean (belum menunggu file selesai diunduh). */
     suspend fun enqueueDownload(
         post: ResolvedPost,
@@ -232,20 +280,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deletePost(postWithMedia: PostWithMedia, deleteFromGallery: Boolean) {
-        viewModelScope.launch {
+        deletePosts(listOf(postWithMedia), deleteFromGallery)
+    }
+
+    fun deletePosts(posts: List<PostWithMedia>, deleteFromGallery: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
             if (deleteFromGallery) {
-                postWithMedia.mediaItems.forEach { item ->
-                    if (item.mediaStoreUri.isNotBlank()) {
-                        try {
-                            val uri = android.net.Uri.parse(item.mediaStoreUri)
-                            getApplication<Application>().contentResolver.delete(uri, null, null)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                posts.forEach { postWithMedia ->
+                    postWithMedia.mediaItems.forEach { item ->
+                        if (item.mediaStoreUri.isNotBlank()) {
+                            try {
+                                val uri = android.net.Uri.parse(item.mediaStoreUri)
+                                getApplication<Application>().contentResolver.delete(uri, null, null)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                     }
                 }
             }
-            database.postDao().deletePostById(postWithMedia.post.id)
+            posts.forEach { postWithMedia ->
+                database.postDao().deletePostById(postWithMedia.post.id)
+            }
+        }
+    }
+
+    suspend fun refreshLibrary() = withContext(Dispatchers.IO) {
+        try {
+            database.mediaItemDao().reconcileStuckDownloadingItems()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.aryaxzell.truedown.ui.components.GlobalDownloadProgressBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -179,6 +180,7 @@ fun MainAppContent(
     }
 
     val currentScreen by viewModel.currentScreen.collectAsState()
+    val globalDownloadStatus by viewModel.globalDownloadStatus.collectAsState()
     val showBottomBar = (currentScreen is AppScreen.Home || currentScreen is AppScreen.Library) && !isInPipMode
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -268,6 +270,9 @@ fun MainAppContent(
                         },
                         onOpenSlideshow = { _ ->
                             // Detail in library
+                        },
+                        onNavigateToDownloader = {
+                            viewModel.navigateTo(AppScreen.Home)
                         }
                     )
                 }
@@ -317,6 +322,18 @@ fun MainAppContent(
                 }
             }
         }
+
+        // Global Progress Indicator for active downloads managed by WorkManager
+        GlobalDownloadProgressBar(
+            globalStatus = globalDownloadStatus,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = if (showBottomBar) 88.dp else 16.dp),
+            onClick = {
+                viewModel.navigateTo(AppScreen.Library)
+            }
+        )
 
         // Floating Pill Navbar & Floating Pill Settings Button Overlay
         AnimatedVisibility(

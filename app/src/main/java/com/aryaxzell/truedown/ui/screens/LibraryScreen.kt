@@ -2,6 +2,7 @@ package com.aryaxzell.truedown.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -12,6 +13,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,12 +35,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Delete
@@ -58,20 +66,31 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.aryaxzell.truedown.ui.components.FloatingPillSnackbarHost
+import com.aryaxzell.truedown.util.VideoThumbnailHelper
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,7 +136,8 @@ fun LibraryScreen(
     viewModel: MainViewModel,
     onOpenVideoPlayer: (PostWithMedia) -> Unit,
     onOpenAudioPlayer: (PostWithMedia) -> Unit,
-    onOpenSlideshow: (PostWithMedia) -> Unit
+    onOpenSlideshow: (PostWithMedia) -> Unit,
+    onNavigateToDownloader: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -132,13 +152,36 @@ fun LibraryScreen(
     var postToDelete by remember { mutableStateOf<PostWithMedia?>(null) }
     var deleteFromGallery by remember { mutableStateOf(false) }
 
-    val filteredPosts = remember(allPosts, currentFilter) {
-        when (currentFilter) {
+    var isSelectionMode by remember { mutableStateOf(false) }
+    val selectedPostIds = remember { mutableStateListOf<String>() }
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    BackHandler(enabled = isSelectionMode) {
+        isSelectionMode = false
+        selectedPostIds.clear()
+    }
+
+    val filteredPosts = remember(allPosts, currentFilter, searchQuery) {
+        val base = when (currentFilter) {
             LibraryFilter.ALL -> allPosts
             LibraryFilter.VIDEO -> allPosts.filter { it.post.type == "VIDEO" || it.post.type == PostType.VIDEO.name }
             LibraryFilter.PHOTO -> allPosts.filter { it.post.type == "SLIDESHOW" || it.post.type == PostType.SLIDESHOW.name }
             LibraryFilter.AUDIO -> allPosts.filter { postWithMedia ->
                 postWithMedia.mediaItems.any { it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name }
+            }
+        }
+        if (searchQuery.isBlank()) {
+            base
+        } else {
+            val q = searchQuery.trim().lowercase()
+            base.filter { item ->
+                item.post.title.lowercase().contains(q) ||
+                item.post.authorName.lowercase().contains(q) ||
+                item.post.authorHandle.lowercase().contains(q) ||
+                item.post.sourceUrl.lowercase().contains(q) ||
+                item.mediaItems.any { it.fileName.lowercase().contains(q) }
             }
         }
     }
@@ -154,28 +197,100 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    if (isSelectionMode) {
+                        IconButton(
+                            onClick = {
+                                isSelectionMode = false
+                                selectedPostIds.clear()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.action_close)
+                            )
+                        }
+                    }
+                },
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isSelectionMode) {
                         Text(
-                            text = stringResource(R.string.library_title),
-                            fontWeight = FontWeight.ExtraBold,
+                            text = stringResource(R.string.selected_count_format, selectedPostIds.size),
+                            fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleLarge
                         )
-                        if (allPosts.isNotEmpty()) {
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                tonalElevation = 1.dp
-                            ) {
-                                Text(
-                                    text = "${allPosts.size}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
-                                )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = stringResource(R.string.library_title),
+                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            if (allPosts.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Text(
+                                        text = "${allPosts.size}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                    )
+                                }
                             }
+                        }
+                    }
+                },
+                actions = {
+                    if (isSelectionMode) {
+                        val allSelected = filteredPosts.isNotEmpty() && selectedPostIds.size == filteredPosts.size
+                        TextButton(
+                            onClick = {
+                                if (allSelected) {
+                                    selectedPostIds.clear()
+                                } else {
+                                    selectedPostIds.clear()
+                                    selectedPostIds.addAll(filteredPosts.map { it.post.id })
+                                }
+                            }
+                        ) {
+                            Text(
+                                text = if (allSelected) stringResource(R.string.action_deselect_all) else stringResource(R.string.action_select_all),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                if (selectedPostIds.isNotEmpty()) {
+                                    showBulkDeleteDialog = true
+                                }
+                            },
+                            enabled = selectedPostIds.isNotEmpty(),
+                            modifier = Modifier.testTag("library_bulk_delete_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.action_delete),
+                                tint = if (selectedPostIds.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            )
+                        }
+                    } else if (allPosts.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                isSelectionMode = true
+                                selectedPostIds.clear()
+                            },
+                            modifier = Modifier.testTag("library_select_button")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.action_select),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 },
@@ -185,7 +300,7 @@ fun LibraryScreen(
             )
         },
         snackbarHost = {
-            SnackbarHost(
+            FloatingPillSnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.padding(bottom = 86.dp)
             )
@@ -197,6 +312,52 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            // Modern Search Bar for Filtering by Title, Author, or Filename
+            if (!isSelectionMode && allPosts.isNotEmpty()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp)
+                        .testTag("library_search_bar"),
+                    placeholder = {
+                        Text(
+                            text = stringResource(R.string.library_search_placeholder),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            maxLines = 1
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = stringResource(R.string.library_search_clear),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                )
+            }
+
             // Expressive Filter Chips Row
             LazyRow(
                 modifier = Modifier
@@ -239,167 +400,314 @@ fun LibraryScreen(
             }
 
             // Items List or Expressive Empty State
-            if (filteredPosts.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        tonalElevation = 1.dp
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 44.dp, horizontal = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(136.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        Brush.radialGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                                                MaterialTheme.colorScheme.surfaceContainer
-                                            )
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.ic_anime_empty_state),
-                                    contentDescription = stringResource(R.string.library_empty_title),
-                                    modifier = Modifier
-                                        .size(104.dp)
-                                        .testTag("library_anime_empty_state")
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Text(
-                                text = stringResource(R.string.library_empty_title),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = stringResource(R.string.library_empty_subtitle),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 20.sp
-                            )
-                        }
-                    }
-                }
-            } else {
-                val activeDownloadingIds = remember(downloadProgressMap, filteredPosts) {
-                    downloadProgressMap.filter { (id, progress) ->
-                        (progress.status == MediaStatus.DOWNLOADING || progress.status == MediaStatus.PENDING) &&
-                                filteredPosts.none { it.post.id == id }
-                    }
-                }
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 120.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    if (activeDownloadingIds.isNotEmpty()) {
-                        items(activeDownloadingIds.keys.toList(), key = { "shimmer_$it" }) { _ ->
-                            ShimmerPostSkeletonItem()
-                        }
-                    }
-
-                    items(
-                        items = filteredPosts,
-                        key = { it.post.id },
-                        contentType = { it.post.type }
-                    ) { postWithMedia ->
-                        val progress = downloadProgressMap[postWithMedia.post.id]
-                        
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { dismissValue ->
-                                if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
-                                    val isDownloading = progress != null && (progress.status == MediaStatus.DOWNLOADING || progress.status == MediaStatus.PENDING)
-                                    if (isDownloading) {
-                                        viewModel.cancelDownload(postWithMedia.post.id)
-                                    } else {
-                                        viewModel.deletePost(postWithMedia, deleteFromGallery = false)
-                                    }
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    scope.launch {
+                        isRefreshing = true
+                        viewModel.refreshLibrary()
+                        delay(600)
+                        isRefreshing = false
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.library_refreshed),
+                            duration = SnackbarDuration.Short
                         )
-
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            backgroundContent = {
-                                val color = MaterialTheme.colorScheme.errorContainer
-                                Box(
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (filteredPosts.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp, vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(32.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tonalElevation = 2.dp,
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 36.dp, horizontal = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                // Illustrative visual asset
+                                Surface(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(color, shape = RoundedCornerShape(24.dp))
-                                        .padding(horizontal = 24.dp),
-                                    contentAlignment = Alignment.CenterEnd
+                                        .size(150.dp)
+                                        .clip(RoundedCornerShape(32.dp)),
+                                    shape = RoundedCornerShape(32.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    shadowElevation = 6.dp,
+                                    tonalElevation = 2.dp,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete",
-                                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                                        modifier = Modifier.size(24.dp)
+                                    Image(
+                                        painter = painterResource(id = R.drawable.img_empty_library),
+                                        contentDescription = stringResource(R.string.library_empty_title),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .testTag("library_empty_illustration"),
+                                        contentScale = ContentScale.Crop
                                     )
                                 }
-                            },
-                            enableDismissFromStartToEnd = false,
-                            enableDismissFromEndToStart = true
-                        ) {
-                            ExpressiveLibraryPostItem(
-                                postWithMedia = postWithMedia,
-                                downloadProgress = progress,
-                                batterySaver = isBatterySaver,
-                                onClick = {
-                                    if (currentFilter == LibraryFilter.AUDIO ||
-                                        postWithMedia.mediaItems.any { (it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name) && postWithMedia.mediaItems.none { m -> m.kind == "VIDEO" || m.kind == "PHOTO" } }) {
-                                        onOpenAudioPlayer(postWithMedia)
-                                    } else if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
-                                        onOpenVideoPlayer(postWithMedia)
-                                    } else {
-                                        onOpenSlideshow(postWithMedia)
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                val emptyTitle = when {
+                                    searchQuery.isNotBlank() -> stringResource(R.string.library_no_search_results)
+                                    currentFilter == LibraryFilter.VIDEO && allPosts.isNotEmpty() -> stringResource(R.string.library_filter_empty_video_title)
+                                    else -> stringResource(R.string.library_empty_title)
+                                }
+
+                                val emptySubtitle = when {
+                                    searchQuery.isNotBlank() -> stringResource(R.string.library_no_search_results_subtitle)
+                                    currentFilter == LibraryFilter.VIDEO && allPosts.isNotEmpty() -> stringResource(R.string.library_filter_empty_video_subtitle)
+                                    else -> stringResource(R.string.library_empty_cta_desc)
+                                }
+
+                                Text(
+                                    text = emptyTitle,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = emptySubtitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 22.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                if (searchQuery.isNotBlank()) {
+                                    OutlinedButton(
+                                        onClick = { searchQuery = "" },
+                                        shape = RoundedCornerShape(18.dp),
+                                        modifier = Modifier.testTag("library_clear_search_cta")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = stringResource(R.string.library_search_clear),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
                                     }
-                                },
-                                onDeleteClick = {
-                                    postToDelete = postWithMedia
-                                    deleteFromGallery = false
-                                },
-                                onShareClick = {
-                                    val firstItem = postWithMedia.mediaItems.firstOrNull { it.status == "DONE" || it.status == MediaStatus.DONE.name }
-                                    firstItem?.let { item ->
-                                        if (item.mediaStoreUri.isNotBlank()) {
-                                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                                type = if (item.kind == "VIDEO" || item.kind == MediaKind.VIDEO.name) "video/*"
-                                                else if (item.kind == "PHOTO" || item.kind == MediaKind.PHOTO.name) "image/*"
-                                                else "audio/*"
-                                                putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(Intent.createChooser(sendIntent, "Bagikan"))
+                                } else {
+                                    // Call-to-action button to open the downloader
+                                    Button(
+                                        onClick = onNavigateToDownloader,
+                                        shape = RoundedCornerShape(20.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                        ),
+                                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(52.dp)
+                                            .testTag("library_empty_cta_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Download,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = stringResource(R.string.library_empty_cta),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Feature highlights row
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                        ) {
+                                            Text(
+                                                text = "✨ Tanpa Watermark",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                        ) {
+                                            Text(
+                                                text = "⚡ Kualitas HD",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                        ) {
+                                            Text(
+                                                text = "🎵 Audio MP3",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
                                         }
                                     }
-                                },
-                                onRetryClick = {
-                                    viewModel.retryFailedDownload(postWithMedia)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    val activeDownloadingIds = remember(downloadProgressMap, filteredPosts) {
+                        downloadProgressMap.filter { (id, progress) ->
+                            (progress.status == MediaStatus.DOWNLOADING || progress.status == MediaStatus.PENDING) &&
+                                    filteredPosts.none { it.post.id == id }
+                        }
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 120.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        if (activeDownloadingIds.isNotEmpty()) {
+                            items(activeDownloadingIds.keys.toList(), key = { "shimmer_$it" }) { _ ->
+                                ShimmerPostSkeletonItem()
+                            }
+                        }
+
+                        items(
+                            items = filteredPosts,
+                            key = { it.post.id },
+                            contentType = { it.post.type }
+                        ) { postWithMedia ->
+                            val progress = downloadProgressMap[postWithMedia.post.id]
+                            val isSelected = selectedPostIds.contains(postWithMedia.post.id)
+                            
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { dismissValue ->
+                                    if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                                        val isDownloading = progress != null && (progress.status == MediaStatus.DOWNLOADING || progress.status == MediaStatus.PENDING)
+                                        if (isDownloading) {
+                                            viewModel.cancelDownload(postWithMedia.post.id)
+                                        } else {
+                                            viewModel.deletePost(postWithMedia, deleteFromGallery = false)
+                                        }
+                                        true
+                                    } else {
+                                        false
+                                    }
                                 }
                             )
+
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                backgroundContent = {
+                                    val color = MaterialTheme.colorScheme.errorContainer
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(color, shape = RoundedCornerShape(24.dp))
+                                            .padding(horizontal = 24.dp),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                },
+                                enableDismissFromStartToEnd = false,
+                                enableDismissFromEndToStart = !isSelectionMode
+                            ) {
+                                ExpressiveLibraryPostItem(
+                                    postWithMedia = postWithMedia,
+                                    downloadProgress = progress,
+                                    batterySaver = isBatterySaver,
+                                    isSelectionMode = isSelectionMode,
+                                    isSelected = isSelected,
+                                    onSelectToggle = {
+                                        if (isSelected) {
+                                            selectedPostIds.remove(postWithMedia.post.id)
+                                        } else {
+                                            selectedPostIds.add(postWithMedia.post.id)
+                                        }
+                                    },
+                                    onClick = {
+                                        if (isSelectionMode) {
+                                            if (isSelected) {
+                                                selectedPostIds.remove(postWithMedia.post.id)
+                                            } else {
+                                                selectedPostIds.add(postWithMedia.post.id)
+                                            }
+                                        } else if (currentFilter == LibraryFilter.AUDIO ||
+                                            postWithMedia.mediaItems.any { (it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name) && postWithMedia.mediaItems.none { m -> m.kind == "VIDEO" || m.kind == "PHOTO" } }) {
+                                            onOpenAudioPlayer(postWithMedia)
+                                        } else if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
+                                            onOpenVideoPlayer(postWithMedia)
+                                        } else {
+                                            onOpenSlideshow(postWithMedia)
+                                        }
+                                    },
+                                    onDeleteClick = {
+                                        postToDelete = postWithMedia
+                                        deleteFromGallery = false
+                                    },
+                                    onShareClick = {
+                                        val firstItem = postWithMedia.mediaItems.firstOrNull { it.status == "DONE" || it.status == MediaStatus.DONE.name }
+                                        firstItem?.let { item ->
+                                            if (item.mediaStoreUri.isNotBlank()) {
+                                                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = if (item.kind == "VIDEO" || item.kind == MediaKind.VIDEO.name) "video/*"
+                                                    else if (item.kind == "PHOTO" || item.kind == MediaKind.PHOTO.name) "image/*"
+                                                    else "audio/*"
+                                                    putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(Intent.createChooser(sendIntent, "Bagikan"))
+                                            }
+                                        }
+                                    },
+                                    onRetryClick = {
+                                        viewModel.retryFailedDownload(postWithMedia)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -485,6 +793,95 @@ fun LibraryScreen(
             }
         )
     }
+
+    // Bulk Delete Modal Dialog (with Gallery Delete Toggle)
+    if (showBulkDeleteDialog && selectedPostIds.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = { showBulkDeleteDialog = false },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Text(
+                    text = stringResource(R.string.dialog_delete_multiple_title, selectedPostIds.size),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Apakah kamu yakin ingin menghapus ${selectedPostIds.size} item terpilih dari Library?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { deleteFromGallery = !deleteFromGallery }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Checkbox(
+                                checked = deleteFromGallery,
+                                onCheckedChange = { deleteFromGallery = it }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.dialog_delete_also_gallery),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    if (deleteFromGallery) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.dialog_delete_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val postsToDelete = allPosts.filter { it.post.id in selectedPostIds }
+                        val count = selectedPostIds.size
+                        viewModel.deletePosts(postsToDelete, deleteFromGallery)
+                        selectedPostIds.clear()
+                        isSelectionMode = false
+                        showBulkDeleteDialog = false
+                        scope.launch {
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(R.string.library_items_deleted, count),
+                                duration = SnackbarDuration.Short
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(stringResource(R.string.action_delete), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showBulkDeleteDialog = false },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -549,6 +946,9 @@ private fun ExpressiveLibraryPostItem(
     postWithMedia: PostWithMedia,
     downloadProgress: DownloadProgress? = null,
     batterySaver: Boolean = false,
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onSelectToggle: (() -> Unit)? = null,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onShareClick: () -> Unit,
@@ -573,6 +973,26 @@ private fun ExpressiveLibraryPostItem(
 
     val isVideo = postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name
 
+    val cachedThumbFile = remember(postWithMedia.post.id) {
+        VideoThumbnailHelper.getThumbnailFile(context, postWithMedia.post.id)
+    }
+    var thumbnailModel by remember(postWithMedia.post.id, thumbnailUri) {
+        mutableStateOf<Any?>(if (cachedThumbFile.exists() && cachedThumbFile.length() > 0) cachedThumbFile else thumbnailUri)
+    }
+
+    LaunchedEffect(postWithMedia.post.id, thumbnailUri) {
+        if (isVideo && (!cachedThumbFile.exists() || cachedThumbFile.length() == 0L) && !thumbnailUri.isNullOrBlank()) {
+            val generated = VideoThumbnailHelper.generateThumbnail(
+                context = context,
+                videoUriOrPath = thumbnailUri,
+                postId = postWithMedia.post.id
+            )
+            if (generated != null && generated.exists()) {
+                thumbnailModel = generated
+            }
+        }
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -580,11 +1000,11 @@ private fun ExpressiveLibraryPostItem(
             .clickable { onClick() }
             .testTag("library_item_${postWithMedia.post.id}"),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = if (isSelected) 4.dp else 2.dp,
         border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+            if (isSelected) 2.dp else 1.dp,
+            if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
         )
     ) {
         Column(
@@ -596,6 +1016,13 @@ private fun ExpressiveLibraryPostItem(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (isSelectionMode) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onSelectToggle?.invoke() },
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
                 // High-fidelity Thumbnail with play badge
                 Surface(
                     modifier = Modifier
@@ -608,11 +1035,11 @@ private fun ExpressiveLibraryPostItem(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!thumbnailUri.isNullOrBlank()) {
+                        if (thumbnailModel != null) {
                             AsyncImage(
                                 model = if (batterySaver) {
                                     coil.request.ImageRequest.Builder(context)
-                                        .data(thumbnailUri)
+                                        .data(thumbnailModel)
                                         .size(100, 100)
                                         .allowHardware(false)
                                         .crossfade(false)
@@ -621,7 +1048,7 @@ private fun ExpressiveLibraryPostItem(
                                         .build()
                                 } else {
                                     coil.request.ImageRequest.Builder(context)
-                                        .data(thumbnailUri)
+                                        .data(thumbnailModel)
                                         .size(220, 220)
                                         .crossfade(true)
                                         .memoryCachePolicy(coil.request.CachePolicy.ENABLED)
@@ -705,41 +1132,43 @@ private fun ExpressiveLibraryPostItem(
                     }
                 }
 
-                // Quick Action / Menu button
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Menu",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                if (!isSelectionMode) {
+                    // Quick Action / Menu button
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                        modifier = Modifier.clip(RoundedCornerShape(18.dp))
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_share), fontWeight = FontWeight.Medium) },
-                            onClick = {
-                                menuExpanded = false
-                                onShareClick()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Outlined.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium) },
-                            onClick = {
-                                menuExpanded = false
-                                onDeleteClick()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                            }
-                        )
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            modifier = Modifier.clip(RoundedCornerShape(18.dp))
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_share), fontWeight = FontWeight.Medium) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onShareClick()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Share, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDeleteClick()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                }
+                            )
+                        }
                     }
                 }
             }

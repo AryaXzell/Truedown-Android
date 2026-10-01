@@ -17,6 +17,13 @@
     <string name="action_recheck">Check link</string>
     <string name="action_paste">Paste</string>
     <string name="action_clear">Clear text</string>
+    <string name="action_select">Select</string>
+    <string name="action_select_all">Select All</string>
+    <string name="action_deselect_all">Deselect All</string>
+    <string name="selected_count_format">%1$d Selected</string>
+    <string name="dialog_delete_multiple_title">Delete %1$d selected items?</string>
+    <string name="library_refreshed">Download status updated</string>
+    <string name="library_items_deleted">%1$d items deleted</string>
 
     <!-- Onboarding -->
     <string name="onboarding_step_format">Step %1$d of %2$d</string>
@@ -103,12 +110,20 @@
 
     <!-- Library Screen -->
     <string name="library_title">Library</string>
+    <string name="library_search_placeholder">Search by title, author, or filename…</string>
+    <string name="library_search_clear">Clear search</string>
+    <string name="library_no_search_results">No matching downloads found</string>
+    <string name="library_no_search_results_subtitle">Try a different keyword or check your spelling.</string>
     <string name="filter_all">All</string>
     <string name="filter_video">Videos</string>
     <string name="filter_photo">Photos</string>
     <string name="filter_audio">Audio</string>
     <string name="library_empty_title">No downloads yet</string>
     <string name="library_empty_subtitle">Your downloaded items will appear here neatly.</string>
+    <string name="library_empty_cta">Open Downloader</string>
+    <string name="library_empty_cta_desc">Paste a TikTok link to start downloading your favorite videos</string>
+    <string name="library_filter_empty_video_title">No videos saved yet</string>
+    <string name="library_filter_empty_video_subtitle">Download watermark-free TikTok videos and play them anytime offline.</string>
 
     <!-- Dialogs -->
     <string name="dialog_delete_title">Remove from Library?</string>

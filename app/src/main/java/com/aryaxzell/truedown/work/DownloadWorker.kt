@@ -130,6 +130,16 @@ class DownloadWorker(
                 uri = downloadResult.uri.toString()
             )
 
+            if (kind == MediaKind.VIDEO) {
+                try {
+                    com.aryaxzell.truedown.util.VideoThumbnailHelper.generateThumbnail(
+                        context = appContext,
+                        videoUriOrPath = downloadResult.uri.toString(),
+                        postId = postId
+                    )
+                } catch (_: Throwable) {}
+            }
+
             val prefs = prefsRepo.userPreferencesFlow.first()
             val mimeType = when (kind) {
                 MediaKind.VIDEO -> "video/mp4"

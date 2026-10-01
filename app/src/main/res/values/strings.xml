@@ -17,6 +17,13 @@
     <string name="action_recheck">Periksa link</string>
     <string name="action_paste">Tempel</string>
     <string name="action_clear">Hapus teks</string>
+    <string name="action_select">Pilih</string>
+    <string name="action_select_all">Pilih Semua</string>
+    <string name="action_deselect_all">Batal Pilih</string>
+    <string name="selected_count_format">%1$d Dipilih</string>
+    <string name="dialog_delete_multiple_title">Hapus %1$d item terpilih?</string>
+    <string name="library_refreshed">Status unduhan diperbarui</string>
+    <string name="library_items_deleted">%1$d item berhasil dihapus</string>
 
     <!-- Onboarding -->
     <string name="onboarding_step_format">Langkah %1$d dari %2$d</string>
@@ -103,12 +110,20 @@
 
     <!-- Library Screen -->
     <string name="library_title">Library</string>
+    <string name="library_search_placeholder">Cari video, nama pembuat, atau judul…</string>
+    <string name="library_search_clear">Hapus pencarian</string>
+    <string name="library_no_search_results">Tidak ada hasil ditemukan</string>
+    <string name="library_no_search_results_subtitle">Coba kata kunci lain atau periksa ejaanmu.</string>
     <string name="filter_all">Semua</string>
     <string name="filter_video">Video</string>
     <string name="filter_photo">Foto</string>
     <string name="filter_audio">Audio</string>
     <string name="library_empty_title">Belum ada unduhan</string>
     <string name="library_empty_subtitle">Hasil unduhan kamu akan tersimpan dan tampil rapi di sini.</string>
+    <string name="library_empty_cta">Buka Pengunduh</string>
+    <string name="library_empty_cta_desc">Tempel tautan TikTok untuk mulai mengunduh video favoritmu</string>
+    <string name="library_filter_empty_video_title">Belum ada video tersimpan</string>
+    <string name="library_filter_empty_video_subtitle">Unduh video TikTok tanpa watermark dan putar kapan saja secara offline.</string>
 
     <!-- Dialogs -->
     <string name="dialog_delete_title">Hapus dari Library?</string>

@@ -63,8 +63,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import com.aryaxzell.truedown.ui.components.FloatingPillSnackbarHost
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -161,7 +163,13 @@ fun HomeScreen(
     LaunchedEffect(resolveState) {
         if (resolveState is ResolveState.Error) {
             val errorResId = (resolveState as ResolveState.Error).messageResId
-            snackbarHostState.showSnackbar(context.getString(errorResId))
+            val message = context.getString(errorResId)
+            viewModel.resetResolveState()
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
         }
     }
 
@@ -222,7 +230,7 @@ fun HomeScreen(
             )
         },
         snackbarHost = {
-            SnackbarHost(
+            FloatingPillSnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier.padding(bottom = 86.dp)
             )
