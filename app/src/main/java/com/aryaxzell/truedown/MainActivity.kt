@@ -150,6 +150,14 @@ class MainActivity : ComponentActivity() {
         handleIncomingShareIntent(intent)
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Pemicu pengecekan clipboard saat aplikasi mendapatkan fokus dari sistem/luar aplikasi (R-31)
+        if (hasFocus) {
+            viewModel.checkClipboardForTikTokUrl(this)
+        }
+    }
+
     private fun handleIncomingShareIntent(intent: Intent?): Boolean {
         if (intent == null) return false
         if (intent.action == Intent.ACTION_SEND && intent.type?.startsWith("text/") == true) {

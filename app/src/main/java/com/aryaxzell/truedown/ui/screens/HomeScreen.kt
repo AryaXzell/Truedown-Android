@@ -79,7 +79,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.aryaxzell.truedown.ui.AppScreen
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -134,30 +137,24 @@ fun HomeScreen(
     val recentPosts by viewModel.recentPosts.collectAsState()
     val downloadProgressMap by viewModel.downloadProgress.collectAsState()
     val preferences by viewModel.preferences.collectAsState()
+    val currentScreen by viewModel.currentScreen.collectAsState()
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(detectedClipboardUrl) {
+    LaunchedEffect(detectedClipboardUrl, currentScreen) {
         val url = detectedClipboardUrl
-        if (!url.isNullOrBlank() && preferences.autoDownloadOnDetect) {
+        if (!url.isNullOrBlank() && preferences.autoDownloadOnDetect && currentScreen is AppScreen.Home && resolveState !is ResolveState.Loading) {
             urlInput = url
             viewModel.clearDetectedClipboardUrl()
-            viewModel.resolveUrl(url)
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.checkClipboardForTikTokUrl(context)
+            viewModel.autoDownloadFromClipboard(url) { messageResId ->
+                scope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    snackbarHostState.showSnackbar(
+                        message = context.getString(messageResId),
+                        duration = SnackbarDuration.Short
+                    )
+                }
             }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.checkClipboardForTikTokUrl(context)
     }
 
     LaunchedEffect(resolveState) {

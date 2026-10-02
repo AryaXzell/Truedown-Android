@@ -21,6 +21,7 @@ import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
+import com.aryaxzell.truedown.util.ClipboardDeduplicator
 import com.aryaxzell.truedown.util.UrlExtractor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -193,7 +194,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
-    private var lastHandledClipboardUrl: String? = null
+    val clipboardDeduplicator = ClipboardDeduplicator()
+
+    fun clipboardKey(text: String): String = clipboardDeduplicator.clipboardKey(text)
+
+    /**
+     * Memeriksa apakah teks clipboard dan timestamp yang diberikan merupakan event baru.
+     * Mengembalikan true jika valid dan baru (tidak duplikat), serta mengupdate state jika [applyState] true.
+     */
+    fun shouldProcessClipboardText(text: String, timestamp: Long = 0L, applyState: Boolean = false): Boolean {
+        val shouldProcess = clipboardDeduplicator.shouldProcess(text, timestamp) { isTikTokUrl(it) }
+        if (shouldProcess && applyState) {
+            _detectedClipboardUrl.value = text
+        }
+        return shouldProcess
+    }
 
     fun checkClipboardForTikTokUrl(context: Context) {
         try {
@@ -204,11 +219,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             description.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML))) {
                     val item = clipboard.primaryClip?.getItemAt(0)
                     val text = item?.text?.toString()?.trim() ?: ""
-                    if (isTikTokUrl(text)) {
-                        // Avoid repeatedly auto-triggering on the exact same clipboard URL once consumed or dismissed
-                        if (text != lastHandledClipboardUrl) {
-                            _detectedClipboardUrl.value = text
-                        }
+                    val timestamp = description.timestamp
+                    if (shouldProcessClipboardText(text, timestamp, applyState = true)) {
                         return
                     }
                 }
@@ -220,17 +232,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearDetectedClipboardUrl() {
-        val current = _detectedClipboardUrl.value
-        if (!current.isNullOrBlank()) {
-            lastHandledClipboardUrl = current
-        }
+        clipboardDeduplicator.clearHandled(_detectedClipboardUrl.value)
         _detectedClipboardUrl.value = null
     }
 
-    fun markClipboardUrlHandled(url: String) {
-        val clean = extractUrl(url)
-        lastHandledClipboardUrl = if (clean.isNotBlank()) clean else url
-        if (_detectedClipboardUrl.value == url || _detectedClipboardUrl.value == clean) {
+    fun markClipboardUrlHandled(url: String, timestamp: Long = 0L) {
+        clipboardDeduplicator.markHandled(url, timestamp)
+        val current = _detectedClipboardUrl.value
+        if (current != null && clipboardDeduplicator.clipboardKey(current) == clipboardDeduplicator.clipboardKey(url)) {
             _detectedClipboardUrl.value = null
         }
     }
@@ -274,6 +283,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val nextScreen = AppScreen.Preview(resolvedPost)
                     navigateTo(nextScreen)
                     onNavigate?.invoke(nextScreen)
+                }
+            }.onFailure { error ->
+                val errorResId = errorResIdFor(error)
+                _resolveState.value = ResolveState.Error(errorResId)
+            }
+        }
+    }
+
+    /**
+     * Digunakan untuk Auto-Download saat URL TikTok terdeteksi di clipboard (R-24 & R-31).
+     * Jika video atau 1 foto: langsung mendownload tanpa membuka Preview.
+     * Jika slideshow banyak foto: membuka SlideshowGridScreen.
+     */
+    fun autoDownloadFromClipboard(url: String, onDownloadStarted: (Int) -> Unit) {
+        markClipboardUrlHandled(url)
+        val cleanUrl = extractUrl(url)
+        if (cleanUrl.isBlank() || !isTikTokUrl(cleanUrl)) {
+            _resolveState.value = ResolveState.Error(com.aryaxzell.truedown.R.string.error_invalid_link)
+            return
+        }
+
+        viewModelScope.launch {
+            _resolveState.value = ResolveState.Loading
+            val result = downloadProvider.resolve(cleanUrl)
+            result.onSuccess { resolvedPost ->
+                _resolveState.value = ResolveState.Success(resolvedPost)
+                if (resolvedPost.type == PostType.SLIDESHOW && resolvedPost.photoUrls.size > 1) {
+                    val nextScreen = AppScreen.SlideshowGrid(resolvedPost)
+                    navigateTo(nextScreen)
+                } else {
+                    startDownload(resolvedPost)
+                    onDownloadStarted(com.aryaxzell.truedown.R.string.preview_starting_download)
                 }
             }.onFailure { error ->
                 val errorResId = errorResIdFor(error)
