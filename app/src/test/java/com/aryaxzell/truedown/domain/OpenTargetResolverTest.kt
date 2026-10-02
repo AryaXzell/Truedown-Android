@@ -20,8 +20,9 @@ class OpenTargetResolverTest {
             title = "Test Post",
             authorName = "Author",
             authorHandle = "handle",
-            coverUrl = "",
             sourceUrl = "https://tiktok.com/@user/video/123",
+            hasAudio = true,
+            photoCount = if (type == PostType.SLIDESHOW) 2 else 0,
             createdAt = 1000L
         )
     }
@@ -33,14 +34,14 @@ class OpenTargetResolverTest {
             MediaItemEntity(
                 postId = post.id,
                 kind = MediaKind.VIDEO.name,
-                url = "https://example.com/video.mp4",
+                fileName = "video.mp4",
                 mediaStoreUri = "content://media/external/video/media/1",
                 status = MediaStatus.DONE.name
             ),
             MediaItemEntity(
                 postId = post.id,
                 kind = MediaKind.AUDIO.name,
-                url = "https://example.com/audio.mp3",
+                fileName = "audio.mp3",
                 mediaStoreUri = "content://media/external/audio/media/1",
                 status = MediaStatus.DONE.name
             )
@@ -56,14 +57,14 @@ class OpenTargetResolverTest {
             MediaItemEntity(
                 postId = post.id,
                 kind = MediaKind.VIDEO.name,
-                url = "https://example.com/video.mp4",
+                fileName = "video.mp4",
                 mediaStoreUri = "",
                 status = MediaStatus.PENDING.name
             ),
             MediaItemEntity(
                 postId = post.id,
                 kind = MediaKind.AUDIO.name,
-                url = "https://example.com/audio.mp3",
+                fileName = "audio.mp3",
                 mediaStoreUri = "content://media/external/audio/media/1",
                 status = MediaStatus.DONE.name
             )
@@ -79,7 +80,7 @@ class OpenTargetResolverTest {
             MediaItemEntity(
                 postId = post.id,
                 kind = MediaKind.PHOTO.name,
-                url = "https://example.com/photo1.jpg",
+                fileName = "photo1.jpg",
                 mediaStoreUri = "content://media/external/images/media/1",
                 status = MediaStatus.DONE.name
             )
@@ -95,7 +96,7 @@ class OpenTargetResolverTest {
             MediaItemEntity(
                 postId = post.id,
                 kind = MediaKind.VIDEO.name,
-                url = "https://example.com/video.mp4",
+                fileName = "video.mp4",
                 mediaStoreUri = "",
                 status = MediaStatus.FAILED.name
             )
