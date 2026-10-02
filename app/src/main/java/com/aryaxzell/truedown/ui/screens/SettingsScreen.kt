@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -81,6 +83,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aryaxzell.truedown.R
+import com.aryaxzell.truedown.ui.DeleteResult
 import com.aryaxzell.truedown.ui.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -495,7 +498,7 @@ fun SettingsScreen(
                 SettingsClickableRow(
                     icon = Icons.Default.Info,
                     title = "Truedown Android",
-                    subtitle = "Versi 1.0.0 (Build Release)",
+                    subtitle = stringResource(R.string.settings_app_version_format, com.aryaxzell.truedown.BuildConfig.VERSION_NAME),
                     onClick = {},
                     testTag = "settings_version_row",
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -556,7 +559,7 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(modifier = Modifier.selectableGroup()) {
                     val langs = listOf(
                         "SYSTEM" to stringResource(R.string.settings_lang_system),
                         "ID" to stringResource(R.string.settings_lang_id),
@@ -567,19 +570,20 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.updateLanguage(code)
-                                    showLanguageDialog = false
-                                }
+                                .selectable(
+                                    selected = preferences.language == code,
+                                    onClick = {
+                                        viewModel.updateLanguage(code)
+                                        showLanguageDialog = false
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = preferences.language == code,
-                                onClick = {
-                                    viewModel.updateLanguage(code)
-                                    showLanguageDialog = false
-                                }
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -612,7 +616,7 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(modifier = Modifier.selectableGroup()) {
                     val themes = listOf(
                         "SYSTEM" to stringResource(R.string.settings_theme_system),
                         "LIGHT" to stringResource(R.string.settings_theme_light),
@@ -623,19 +627,20 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.updateTheme(mode)
-                                    showThemeDialog = false
-                                }
+                                .selectable(
+                                    selected = preferences.themeMode == mode,
+                                    onClick = {
+                                        viewModel.updateTheme(mode)
+                                        showThemeDialog = false
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = preferences.themeMode == mode,
-                                onClick = {
-                                    viewModel.updateTheme(mode)
-                                    showThemeDialog = false
-                                }
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -668,7 +673,7 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(modifier = Modifier.selectableGroup()) {
                     val options = listOf(
                         "STANDARD" to stringResource(R.string.quality_standard),
                         "HD" to stringResource(R.string.quality_hd)
@@ -678,19 +683,20 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.updateDefaultQuality(q)
-                                    showQualityDialog = false
-                                }
+                                .selectable(
+                                    selected = preferences.defaultQuality == q,
+                                    onClick = {
+                                        viewModel.updateDefaultQuality(q)
+                                        showQualityDialog = false
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = preferences.defaultQuality == q,
-                                onClick = {
-                                    viewModel.updateDefaultQuality(q)
-                                    showQualityDialog = false
-                                }
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -723,7 +729,7 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(modifier = Modifier.selectableGroup()) {
                     val options = listOf(
                         "AUTO" to stringResource(R.string.settings_fallback_auto),
                         "FAIL" to stringResource(R.string.settings_fallback_fail)
@@ -733,19 +739,20 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.updateQualityFallback(fb)
-                                    showFallbackDialog = false
-                                }
+                                .selectable(
+                                    selected = preferences.qualityFallback == fb,
+                                    onClick = {
+                                        viewModel.updateQualityFallback(fb)
+                                        showFallbackDialog = false
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = preferences.qualityFallback == fb,
-                                onClick = {
-                                    viewModel.updateQualityFallback(fb)
-                                    showFallbackDialog = false
-                                }
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -778,7 +785,7 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(modifier = Modifier.selectableGroup()) {
                     val options = listOf(
                         "SKIP" to stringResource(R.string.settings_duplicate_skip),
                         "RE_DOWNLOAD" to stringResource(R.string.settings_duplicate_redownload)
@@ -788,19 +795,20 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.updateDuplicateRule(rule)
-                                    showDuplicateDialog = false
-                                }
+                                .selectable(
+                                    selected = preferences.duplicateRule == rule,
+                                    onClick = {
+                                        viewModel.updateDuplicateRule(rule)
+                                        showDuplicateDialog = false
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
                                 selected = preferences.duplicateRule == rule,
-                                onClick = {
-                                    viewModel.updateDuplicateRule(rule)
-                                    showDuplicateDialog = false
-                                }
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(text = label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
@@ -822,7 +830,10 @@ fun SettingsScreen(
     // Clear Library Confirmation Dialog
     if (showClearLibraryDialog) {
         AlertDialog(
-            onDismissRequest = { showClearLibraryDialog = false },
+            onDismissRequest = {
+                showClearLibraryDialog = false
+                clearFromGallery = false
+            },
             shape = RoundedCornerShape(26.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
@@ -875,10 +886,17 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.clearAllLibrary(clearFromGallery)
+                        val deleteGal = clearFromGallery
                         showClearLibraryDialog = false
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Riwayat Library berhasil dibersihkan")
+                        clearFromGallery = false
+                        viewModel.clearAllLibrary(deleteGal) { result ->
+                            scope.launch {
+                                if (result is DeleteResult.DeletedButFilesFailed) {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.delete_files_failed))
+                                } else {
+                                    snackbarHostState.showSnackbar("Riwayat Library berhasil dibersihkan")
+                                }
+                            }
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
@@ -889,7 +907,10 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showClearLibraryDialog = false },
+                    onClick = {
+                        showClearLibraryDialog = false
+                        clearFromGallery = false
+                    },
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
@@ -918,31 +939,33 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(modifier = Modifier.selectableGroup()) {
                     Text(
-                        text = "Amankan dan percepat resolusi domain menggunakan protokol DoH terenkripsi.",
+                        text = "Pilih DNS over HTTPS (DoH)",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     providers.forEach { provider ->
+                        val isSelected = preferences.dohProvider.equals(provider.key, ignoreCase = true)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.updateDohProvider(provider.key)
-                                    showDohDialog = false
-                                }
+                                .selectable(
+                                    selected = isSelected,
+                                    onClick = {
+                                        viewModel.updateDohProvider(provider.key)
+                                        showDohDialog = false
+                                    },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
                                 .padding(vertical = 10.dp, horizontal = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = preferences.dohProvider.equals(provider.key, ignoreCase = true),
-                                onClick = {
-                                    viewModel.updateDohProvider(provider.key)
-                                    showDohDialog = false
-                                }
+                                selected = isSelected,
+                                onClick = null
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(

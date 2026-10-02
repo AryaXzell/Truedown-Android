@@ -86,7 +86,8 @@ Compare the resulting hash with the contents of the provided `.sha256` file.
 
 - **No Analytics:** Truedown does not include third-party trackers, analytics SDKs, or crash beacons.
 - **No User Accounts:** No registration or login required.
-- **No Cloud Uploads:** Download requests are made directly from your device.
+- **Third-Party Service Disclosure:** Links that you paste or share are sent to a third-party service (TikWM) to fetch media metadata and stream URLs; Truedown does not transmit any other personal data.
+- **Local Storage:** Downloaded files, database records, and app preferences remain stored locally on your device.
 
 ---
 

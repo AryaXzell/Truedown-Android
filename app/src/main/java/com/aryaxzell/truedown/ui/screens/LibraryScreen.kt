@@ -117,8 +117,11 @@ import com.aryaxzell.truedown.data.local.PostWithMedia
 import com.aryaxzell.truedown.domain.model.DownloadProgress
 import com.aryaxzell.truedown.domain.model.MediaKind
 import com.aryaxzell.truedown.domain.model.MediaStatus
+import com.aryaxzell.truedown.domain.model.OpenTarget
 import com.aryaxzell.truedown.domain.model.PostType
+import com.aryaxzell.truedown.domain.model.resolveOpenTarget
 import com.aryaxzell.truedown.domain.model.toHumanReadableSize
+import com.aryaxzell.truedown.ui.DeleteResult
 import com.aryaxzell.truedown.ui.MainViewModel
 import com.aryaxzell.truedown.ui.components.ShimmerGalleryListSkeleton
 import com.aryaxzell.truedown.ui.components.ShimmerPostSkeletonItem
@@ -150,7 +153,8 @@ fun LibraryScreen(
     var currentFilter by remember { mutableStateOf(LibraryFilter.ALL) }
 
     var postToDelete by remember { mutableStateOf<PostWithMedia?>(null) }
-    var deleteFromGallery by remember { mutableStateOf(false) }
+    var deleteFromGallerySingle by remember { mutableStateOf(false) }
+    var deleteFromGalleryBulk by remember { mutableStateOf(false) }
 
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedPostIds = remember { mutableStateListOf<String>() }
@@ -266,6 +270,7 @@ fun LibraryScreen(
                         IconButton(
                             onClick = {
                                 if (selectedPostIds.isNotEmpty()) {
+                                    deleteFromGalleryBulk = false
                                     showBulkDeleteDialog = true
                                 }
                             },
@@ -351,7 +356,7 @@ fun LibraryScreen(
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
@@ -675,18 +680,22 @@ fun LibraryScreen(
                                             } else {
                                                 selectedPostIds.add(postWithMedia.post.id)
                                             }
-                                        } else if (currentFilter == LibraryFilter.AUDIO ||
-                                            postWithMedia.mediaItems.any { (it.kind == "AUDIO" || it.kind == MediaKind.AUDIO.name) && postWithMedia.mediaItems.none { m -> m.kind == "VIDEO" || m.kind == "PHOTO" } }) {
-                                            onOpenAudioPlayer(postWithMedia)
-                                        } else if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
-                                            onOpenVideoPlayer(postWithMedia)
                                         } else {
-                                            onOpenSlideshow(postWithMedia)
+                                            when (val target = resolveOpenTarget(postWithMedia)) {
+                                                is OpenTarget.Video -> onOpenVideoPlayer(target.postWithMedia)
+                                                is OpenTarget.Audio -> onOpenAudioPlayer(target.postWithMedia)
+                                                is OpenTarget.Slideshow -> onOpenSlideshow(target.postWithMedia)
+                                                is OpenTarget.NotFound -> {
+                                                    scope.launch {
+                                                        snackbarHostState.showSnackbar(context.getString(R.string.player_media_not_found))
+                                                    }
+                                                }
+                                            }
                                         }
                                     },
                                     onDeleteClick = {
+                                        deleteFromGallerySingle = false
                                         postToDelete = postWithMedia
-                                        deleteFromGallery = false
                                     },
                                     onShareClick = {
                                         val firstItem = postWithMedia.mediaItems.firstOrNull { it.status == "DONE" || it.status == MediaStatus.DONE.name }
@@ -718,7 +727,10 @@ fun LibraryScreen(
     // Delete Modal Dialog (with Gallery Delete Toggle)
     postToDelete?.let { postItem ->
         AlertDialog(
-            onDismissRequest = { postToDelete = null },
+            onDismissRequest = {
+                postToDelete = null
+                deleteFromGallerySingle = false
+            },
             shape = RoundedCornerShape(26.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
@@ -742,15 +754,15 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { deleteFromGallery = !deleteFromGallery }
+                            .clickable { deleteFromGallerySingle = !deleteFromGallerySingle }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Checkbox(
-                                checked = deleteFromGallery,
-                                onCheckedChange = { deleteFromGallery = it }
+                                checked = deleteFromGallerySingle,
+                                onCheckedChange = { deleteFromGallerySingle = it }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -760,7 +772,7 @@ fun LibraryScreen(
                             )
                         }
                     }
-                    if (deleteFromGallery) {
+                    if (deleteFromGallerySingle) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(R.string.dialog_delete_warning),
@@ -774,8 +786,17 @@ fun LibraryScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.deletePost(postItem, deleteFromGallery)
+                        val item = postItem
+                        val deleteGal = deleteFromGallerySingle
                         postToDelete = null
+                        deleteFromGallerySingle = false
+                        viewModel.deletePost(item, deleteGal) { result ->
+                            if (result is DeleteResult.DeletedButFilesFailed) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.delete_files_failed))
+                                }
+                            }
+                        }
                     },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -785,7 +806,10 @@ fun LibraryScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { postToDelete = null },
+                    onClick = {
+                        postToDelete = null
+                        deleteFromGallerySingle = false
+                    },
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
@@ -797,7 +821,10 @@ fun LibraryScreen(
     // Bulk Delete Modal Dialog (with Gallery Delete Toggle)
     if (showBulkDeleteDialog && selectedPostIds.isNotEmpty()) {
         AlertDialog(
-            onDismissRequest = { showBulkDeleteDialog = false },
+            onDismissRequest = {
+                showBulkDeleteDialog = false
+                deleteFromGalleryBulk = false
+            },
             shape = RoundedCornerShape(26.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             title = {
@@ -821,15 +848,15 @@ fun LibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { deleteFromGallery = !deleteFromGallery }
+                            .clickable { deleteFromGalleryBulk = !deleteFromGalleryBulk }
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
                         ) {
                             Checkbox(
-                                checked = deleteFromGallery,
-                                onCheckedChange = { deleteFromGallery = it }
+                                checked = deleteFromGalleryBulk,
+                                onCheckedChange = { deleteFromGalleryBulk = it }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
@@ -839,7 +866,7 @@ fun LibraryScreen(
                             )
                         }
                     }
-                    if (deleteFromGallery) {
+                    if (deleteFromGalleryBulk) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(R.string.dialog_delete_warning),
@@ -855,15 +882,22 @@ fun LibraryScreen(
                     onClick = {
                         val postsToDelete = allPosts.filter { it.post.id in selectedPostIds }
                         val count = selectedPostIds.size
-                        viewModel.deletePosts(postsToDelete, deleteFromGallery)
+                        val deleteGal = deleteFromGalleryBulk
                         selectedPostIds.clear()
                         isSelectionMode = false
                         showBulkDeleteDialog = false
-                        scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = context.getString(R.string.library_items_deleted, count),
-                                duration = SnackbarDuration.Short
-                            )
+                        deleteFromGalleryBulk = false
+                        viewModel.deletePosts(postsToDelete, deleteGal) { result ->
+                            scope.launch {
+                                if (result is DeleteResult.DeletedButFilesFailed) {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.delete_files_failed))
+                                } else {
+                                    snackbarHostState.showSnackbar(
+                                        message = context.getString(R.string.library_items_deleted, count),
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            }
                         }
                     },
                     shape = RoundedCornerShape(14.dp),
@@ -874,7 +908,10 @@ fun LibraryScreen(
             },
             dismissButton = {
                 TextButton(
-                    onClick = { showBulkDeleteDialog = false },
+                    onClick = {
+                        showBulkDeleteDialog = false
+                        deleteFromGalleryBulk = false
+                    },
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
@@ -976,19 +1013,19 @@ private fun ExpressiveLibraryPostItem(
     val cachedThumbFile = remember(postWithMedia.post.id) {
         VideoThumbnailHelper.getThumbnailFile(context, postWithMedia.post.id)
     }
-    var thumbnailModel by remember(postWithMedia.post.id, thumbnailUri) {
-        mutableStateOf<Any?>(if (cachedThumbFile.exists() && cachedThumbFile.length() > 0) cachedThumbFile else thumbnailUri)
-    }
-
-    LaunchedEffect(postWithMedia.post.id, thumbnailUri) {
-        if (isVideo && (!cachedThumbFile.exists() || cachedThumbFile.length() == 0L) && !thumbnailUri.isNullOrBlank()) {
-            val generated = VideoThumbnailHelper.generateThumbnail(
-                context = context,
-                videoUriOrPath = thumbnailUri,
-                postId = postWithMedia.post.id
-            )
-            if (generated != null && generated.exists()) {
-                thumbnailModel = generated
+    val thumbnailModel by androidx.compose.runtime.produceState<Any?>(initialValue = thumbnailUri, key1 = postWithMedia.post.id, key2 = thumbnailUri) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (cachedThumbFile.exists() && cachedThumbFile.length() > 0) {
+                cachedThumbFile
+            } else if (isVideo && !thumbnailUri.isNullOrBlank()) {
+                val generated = VideoThumbnailHelper.generateThumbnail(
+                    context = context,
+                    videoUriOrPath = thumbnailUri,
+                    postId = postWithMedia.post.id
+                )
+                if (generated != null && generated.exists()) generated else thumbnailUri
+            } else {
+                thumbnailUri
             }
         }
     }

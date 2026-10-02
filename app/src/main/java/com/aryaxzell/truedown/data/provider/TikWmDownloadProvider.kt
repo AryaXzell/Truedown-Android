@@ -12,6 +12,7 @@ import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -95,7 +96,21 @@ class TikWmDownloadProvider(
                     .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36")
                     .build()
 
-                val response = client.newCall(request).execute()
+                val call = client.newCall(request)
+                val response = kotlinx.coroutines.suspendCancellableCoroutine<Response> { continuation ->
+                    continuation.invokeOnCancellation {
+                        call.cancel()
+                    }
+                    call.enqueue(object : okhttp3.Callback {
+                        override fun onResponse(call: okhttp3.Call, response: Response) {
+                            continuation.resumeWith(Result.success(response))
+                        }
+                        override fun onFailure(call: okhttp3.Call, e: IOException) {
+                            if (continuation.isCancelled) return
+                            continuation.resumeWith(Result.failure(e))
+                        }
+                    })
+                }
                 val bodyString = response.body?.string()
 
                 if (!response.isSuccessful || bodyString.isNullOrBlank()) {
@@ -145,23 +160,25 @@ class TikWmDownloadProvider(
                     }
                 }
 
-                val rawPlay = data.optString("play", "").takeIf { it.isNotBlank() }
-                val rawHdPlay = data.optString("hdplay", "").takeIf { it.isNotBlank() }
-                val rawMusic = data.optString("music", "").takeIf { it.isNotBlank() }
-                val rawCover = data.optString("cover", "")
-                    .ifBlank { data.optString("origin_cover", "") }
-                    .ifBlank { data.optString("dynamic_cover", "") }
-                    .takeIf { it.isNotBlank() }
+                val rawPlayStr = data.optString("play", "")
+                val rawHdPlayStr = data.optString("hdplay", "")
+                val rawMusicStr = data.optString("music", "")
+                var rawCoverStr = data.optString("cover", "")
+                if (rawCoverStr.isBlank()) rawCoverStr = data.optString("origin_cover", "")
+                if (rawCoverStr.isBlank()) rawCoverStr = data.optString("dynamic_cover", "")
 
-                val standardVideoUrl = rawPlay?.let { normalizeUrl(it) }
-                val hdVideoUrl = rawHdPlay?.let { normalizeUrl(it) }
-                val audioUrl = rawMusic?.let { normalizeUrl(it) }
-                val coverUrl = rawCover?.let { normalizeUrl(it) } ?: photoUrls.firstOrNull()
+                val standardVideoUrl = if (rawPlayStr.isNotBlank()) normalizeUrl(rawPlayStr) else null
+                val hdVideoUrl = if (rawHdPlayStr.isNotBlank()) normalizeUrl(rawHdPlayStr) else null
+                val audioUrl = if (rawMusicStr.isNotBlank()) normalizeUrl(rawMusicStr) else null
+                val coverUrl = if (rawCoverStr.isNotBlank()) normalizeUrl(rawCoverStr) else photoUrls.firstOrNull()
                 val durationSec = data.optInt("duration", 0)
 
-                val rawStandardSize = data.optLong("size", 0L).takeIf { it > 0 }
-                val rawHdSize = data.optLong("hd_size", 0L).takeIf { it > 0 }
-                val rawAudioSize = data.optJSONObject("music_info")?.optLong("size", 0L)?.takeIf { it > 0 }
+                val rawStdSize = data.optLong("size", 0L)
+                val rawStandardSize: Long? = if (rawStdSize > 0L) rawStdSize else null
+                val rawHdSizeVal = data.optLong("hd_size", 0L)
+                val rawHdSize: Long? = if (rawHdSizeVal > 0L) rawHdSizeVal else null
+                val rawAudioSizeVal = data.optJSONObject("music_info")?.optLong("size", 0L) ?: 0L
+                val rawAudioSize: Long? = if (rawAudioSizeVal > 0L) rawAudioSizeVal else null
 
                 val finalStandardSize = rawStandardSize ?: fetchContentLength(standardVideoUrl)
                 val finalHdSize = rawHdSize ?: fetchContentLength(hdVideoUrl)
@@ -189,6 +206,8 @@ class TikWmDownloadProvider(
 
                 memoryCache[cleanUrl] = CachedEntry(resolved, System.currentTimeMillis())
                 Result.success(resolved)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: SocketTimeoutException) {
                 Result.failure(ProviderError.TimeoutError)
             } catch (e: IOException) {

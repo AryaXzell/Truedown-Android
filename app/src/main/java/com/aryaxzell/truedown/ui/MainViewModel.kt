@@ -21,6 +21,7 @@ import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.domain.model.ResolvedPost
+import com.aryaxzell.truedown.util.AppLogger
 import com.aryaxzell.truedown.util.ClipboardDeduplicator
 import com.aryaxzell.truedown.util.UrlExtractor
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,11 @@ sealed class ResolveState {
     object Loading : ResolveState()
     data class Success(val post: ResolvedPost) : ResolveState()
     data class Error(val messageResId: Int) : ResolveState()
+}
+
+sealed class DeleteResult {
+    object Deleted : DeleteResult()
+    data class DeletedButFilesFailed(val failedCount: Int) : DeleteResult()
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -244,11 +250,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun isTikTokUrl(text: String): Boolean {
-        if (text.isBlank()) return false
+    fun isTikTokUrl(text: String): Boolean {
+        if (text.isBlank() || text.length > 500) return false
+        if (text.count { it == '\n' } > 2) return false
+        val cleanUrl = extractUrl(text)
+        if (cleanUrl.isBlank()) return false
         val regex = Regex("https?://([a-zA-Z0-9_-]+\\.)?tiktok\\.com(/.*)?", RegexOption.IGNORE_CASE)
         val shortRegex = Regex("https?://(vt|vm)\\.tiktok\\.com/([a-zA-Z0-9]+)", RegexOption.IGNORE_CASE)
-        return regex.containsMatchIn(text) || shortRegex.containsMatchIn(text) || text.contains("tiktok.com/")
+        return regex.containsMatchIn(cleanUrl) || shortRegex.containsMatchIn(cleanUrl) || cleanUrl.contains("tiktok.com/")
     }
 
     fun errorResIdFor(error: Throwable): Int = when (error) {
@@ -262,6 +271,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         else -> com.aryaxzell.truedown.R.string.error_unknown
     }
 
+    private var resolveJob: kotlinx.coroutines.Job? = null
+
+    fun cancelResolve() {
+        resolveJob?.cancel()
+        resolveJob = null
+        _resolveState.value = ResolveState.Idle
+    }
+
     fun resolveUrl(url: String, onNavigate: ((AppScreen) -> Unit)? = null) {
         markClipboardUrlHandled(url)
         val cleanUrl = extractUrl(url)
@@ -270,7 +287,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        viewModelScope.launch {
+        resolveJob?.cancel()
+        resolveJob = viewModelScope.launch {
             _resolveState.value = ResolveState.Loading
             val result = downloadProvider.resolve(cleanUrl)
             result.onSuccess { resolvedPost ->
@@ -285,6 +303,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onNavigate?.invoke(nextScreen)
                 }
             }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) return@onFailure
                 val errorResId = errorResIdFor(error)
                 _resolveState.value = ResolveState.Error(errorResId)
             }
@@ -304,7 +323,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        viewModelScope.launch {
+        resolveJob?.cancel()
+        resolveJob = viewModelScope.launch {
             _resolveState.value = ResolveState.Loading
             val result = downloadProvider.resolve(cleanUrl)
             result.onSuccess { resolvedPost ->
@@ -317,6 +337,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onDownloadStarted(com.aryaxzell.truedown.R.string.preview_starting_download)
                 }
             }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) return@onFailure
                 val errorResId = errorResIdFor(error)
                 _resolveState.value = ResolveState.Error(errorResId)
             }
@@ -356,29 +377,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         downloadScheduler.cancelDownload(postId)
     }
 
-    fun deletePost(postWithMedia: PostWithMedia, deleteFromGallery: Boolean) {
-        deletePosts(listOf(postWithMedia), deleteFromGallery)
+    fun deletePost(postWithMedia: PostWithMedia, deleteFromGallery: Boolean, onResult: ((DeleteResult) -> Unit)? = null) {
+        deletePosts(listOf(postWithMedia), deleteFromGallery, onResult)
     }
 
-    fun deletePosts(posts: List<PostWithMedia>, deleteFromGallery: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (deleteFromGallery) {
-                posts.forEach { postWithMedia ->
-                    postWithMedia.mediaItems.forEach { item ->
-                        if (item.mediaStoreUri.isNotBlank()) {
-                            try {
-                                val uri = android.net.Uri.parse(item.mediaStoreUri)
-                                getApplication<Application>().contentResolver.delete(uri, null, null)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+    fun deletePosts(posts: List<PostWithMedia>, deleteFromGallery: Boolean, onResult: ((DeleteResult) -> Unit)? = null) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                var failedFiles = 0
+                if (deleteFromGallery) {
+                    val resolver = getApplication<Application>().contentResolver
+                    posts.forEach { postWithMedia ->
+                        postWithMedia.mediaItems.forEach { item ->
+                            if (item.mediaStoreUri.isNotBlank()) {
+                                try {
+                                    val uri = android.net.Uri.parse(item.mediaStoreUri)
+                                    val count = resolver.delete(uri, null, null)
+                                    if (count <= 0) {
+                                        failedFiles++
+                                    }
+                                } catch (e: Exception) {
+                                    failedFiles++
+                                    AppLogger.e("DeleteMedia", "Failed to delete mediaStoreUri: ${e.message}")
+                                }
                             }
                         }
                     }
                 }
+                posts.forEach { postWithMedia ->
+                    database.postDao().deletePostById(postWithMedia.post.id)
+                }
+                if (failedFiles > 0) DeleteResult.DeletedButFilesFailed(failedFiles) else DeleteResult.Deleted
             }
-            posts.forEach { postWithMedia ->
-                database.postDao().deletePostById(postWithMedia.post.id)
-            }
+            onResult?.invoke(result)
         }
     }
 
@@ -386,28 +417,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             database.mediaItemDao().reconcileStuckDownloadingItems()
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.e("RefreshLibrary", "Failed to reconcile stuck items: ${e.message}")
         }
     }
 
-    fun clearAllLibrary(deleteFromGallery: Boolean) {
+    fun clearAllLibrary(deleteFromGallery: Boolean, onResult: ((DeleteResult) -> Unit)? = null) {
         viewModelScope.launch {
-            if (deleteFromGallery) {
-                val all = database.postDao().getAllPostsWithMediaSync()
-                all.forEach { postWithMedia ->
-                    postWithMedia.mediaItems.forEach { item ->
-                        if (item.mediaStoreUri.isNotBlank()) {
-                            try {
-                                val uri = android.net.Uri.parse(item.mediaStoreUri)
-                                getApplication<Application>().contentResolver.delete(uri, null, null)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
+            val result = withContext(Dispatchers.IO) {
+                var failedFiles = 0
+                if (deleteFromGallery) {
+                    val resolver = getApplication<Application>().contentResolver
+                    val all = database.postDao().getAllPostsWithMediaSync()
+                    all.forEach { postWithMedia ->
+                        postWithMedia.mediaItems.forEach { item ->
+                            if (item.mediaStoreUri.isNotBlank()) {
+                                try {
+                                    val uri = android.net.Uri.parse(item.mediaStoreUri)
+                                    val count = resolver.delete(uri, null, null)
+                                    if (count <= 0) {
+                                        failedFiles++
+                                    }
+                                } catch (e: Exception) {
+                                    failedFiles++
+                                    AppLogger.e("DeleteMedia", "Failed to delete mediaStoreUri: ${e.message}")
+                                }
                             }
                         }
                     }
                 }
+                database.postDao().deleteAllPosts()
+                if (failedFiles > 0) DeleteResult.DeletedButFilesFailed(failedFiles) else DeleteResult.Deleted
             }
-            database.postDao().deleteAllPosts()
+            onResult?.invoke(result)
         }
     }
 

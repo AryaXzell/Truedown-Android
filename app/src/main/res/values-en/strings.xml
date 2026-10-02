@@ -188,4 +188,24 @@
     <string name="notif_downloading">Downloading…</string>
     <string name="notif_download_success">Download Completed</string>
     <string name="notif_download_failed">Download Failed</string>
+
+    <!-- Part 2 Additions -->
+    <string name="delete_files_failed">Record deleted, but files could not be deleted from here. Please delete them from your gallery.</string>
+    <string name="home_resolve_cancel">Cancel</string>
+    <string name="home_resolve_retry">Retry</string>
+    <string name="settings_app_version_format">Version %1$s</string>
+    <string name="player_media_not_found">Media file not found or has been deleted.</string>
+    <string name="player_btn_close">Close</string>
+    <string name="a11y_open_photo">Open photo</string>
+    <string name="a11y_photo_item_desc">Photo %1$d of %2$d</string>
+    <string name="a11y_video_slider_desc">Video playback position</string>
+    <string name="a11y_audio_slider_desc">Audio playback position</string>
+    <string name="a11y_slider_state_format">%1$s of %2$s</string>
+    <string name="a11y_btn_paste">Paste link</string>
+    <string name="a11y_progress_downloading">Downloading %1$d items</string>
+    <string name="a11y_view_in_library">View in Library</string>
+    <string name="onboarding_notif_active">Notifications Active</string>
+    <string name="onboarding_notif_active_desc">You will receive real-time download progress.</string>
+    <string name="onboarding_notif_disabled_note">Download progress will not appear in the notification panel.</string>
+    <string name="onboarding_btn_open_settings">Open Settings</string>
 </resources>

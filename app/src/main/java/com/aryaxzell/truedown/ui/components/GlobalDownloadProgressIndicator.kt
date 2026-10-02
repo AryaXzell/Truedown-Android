@@ -33,10 +33,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.ui.GlobalDownloadStatus
 
 @Composable
@@ -45,6 +52,8 @@ fun GlobalDownloadProgressBar(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
+    val a11yViewInLib = stringResource(R.string.a11y_view_in_library)
+
     AnimatedVisibility(
         visible = globalStatus.hasActiveDownloads,
         enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -62,7 +71,18 @@ fun GlobalDownloadProgressBar(
                     .widthIn(max = 560.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(22.dp))
-                    .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+                    .semantics {
+                        liveRegion = LiveRegionMode.Polite
+                        stateDescription = "${globalStatus.progressPercent}%"
+                    }
+                    .then(
+                        if (onClick != null) {
+                            Modifier.clickable(
+                                role = Role.Button,
+                                onClickLabel = a11yViewInLib
+                            ) { onClick() }
+                        } else Modifier
+                    )
                     .testTag("global_download_progress_indicator"),
                 shape = RoundedCornerShape(22.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -113,11 +133,7 @@ fun GlobalDownloadProgressBar(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (globalStatus.activeCount > 1) {
-                                        "Mengunduh ${globalStatus.activeCount} konten…"
-                                    } else {
-                                        "Mengunduh konten…"
-                                    },
+                                    text = stringResource(R.string.a11y_progress_downloading, globalStatus.activeCount),
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -150,7 +166,7 @@ fun GlobalDownloadProgressBar(
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
                                 imageVector = Icons.Default.ArrowForward,
-                                contentDescription = "Lihat di Library",
+                                contentDescription = a11yViewInLib,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 modifier = Modifier.size(18.dp)
                             )

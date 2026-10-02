@@ -40,6 +40,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FlashOn
@@ -60,6 +61,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -163,10 +165,16 @@ fun HomeScreen(
             val message = context.getString(errorResId)
             viewModel.resetResolveState()
             snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(
+            val snackbarResult = snackbarHostState.showSnackbar(
                 message = message,
+                actionLabel = context.getString(R.string.home_resolve_retry),
                 duration = SnackbarDuration.Short
             )
+            if (snackbarResult == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                if (urlInput.isNotBlank()) {
+                    viewModel.resolveUrl(urlInput)
+                }
+            }
         }
     }
 
@@ -395,7 +403,10 @@ fun HomeScreen(
                                 tonalElevation = 1.dp,
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(14.dp))
-                                    .clickable {
+                                    .clickable(
+                                        role = androidx.compose.ui.semantics.Role.Button,
+                                        onClickLabel = stringResource(R.string.a11y_btn_paste)
+                                    ) {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                         val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
                                         if (clip.isNotBlank()) {
@@ -443,7 +454,7 @@ fun HomeScreen(
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surface
                             ),
@@ -524,13 +535,38 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .testTag("home_shimmer_skeleton")
                         ) {
-                            Text(
-                                text = stringResource(R.string.home_checking_link),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_checking_link),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                OutlinedButton(
+                                    onClick = { viewModel.cancelResolve() },
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.testTag("btn_cancel_resolve"),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = stringResource(R.string.home_resolve_cancel),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                             ShimmerHeroPreviewSkeleton()
                         }
                     }

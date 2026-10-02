@@ -63,6 +63,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -243,12 +251,25 @@ fun SlideshowGridScreen(
         ) {
             itemsIndexed(post.photoUrls) { index, photoUrl ->
                 val isSelected = selectedMap[index] == true
+                val a11yOpenLabel = stringResource(R.string.a11y_open_photo)
+                val a11yPhotoDesc = stringResource(R.string.a11y_photo_item_desc, index + 1, post.photoUrls.size)
 
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(18.dp))
+                        .semantics {
+                            role = Role.Checkbox
+                            toggleableState = ToggleableState(isSelected)
+                            contentDescription = a11yPhotoDesc
+                            customActions = listOf(
+                                CustomAccessibilityAction(label = a11yOpenLabel) {
+                                    onOpenPhotoViewer(index)
+                                    true
+                                }
+                            )
+                        }
                         .clickable { onOpenPhotoViewer(index) },
                     shape = RoundedCornerShape(18.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -265,34 +286,42 @@ fun SlideshowGridScreen(
                                 .addHeader("Referer", "https://www.tiktok.com/")
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = "Foto ${index + 1}",
+                            contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
 
-                        // Selection Checkbox Overlay
+                        // Selection Checkbox Overlay with >= 48dp minimum interactive touch target
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primary
-                                    else Color.Black.copy(alpha = 0.5f)
-                                )
-                                .clickable {
+                                .size(48.dp)
+                                .clickable(
+                                    role = Role.Checkbox,
+                                    onClickLabel = if (isSelected) "Hapus pilihan" else "Pilih foto"
+                                ) {
                                     selectedMap[index] = !isSelected
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (isSelected) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary
+                                        else Color.Black.copy(alpha = 0.5f)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
 

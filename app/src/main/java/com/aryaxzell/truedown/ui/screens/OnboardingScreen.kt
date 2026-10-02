@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -112,9 +114,12 @@ fun OnboardingScreen(
         )
     }
 
+    var notifPermissionRequested by remember { mutableStateOf(false) }
+
     val notifPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        notifPermissionRequested = true
         hasNotificationPermission = isGranted
     }
 
@@ -123,6 +128,28 @@ fun OnboardingScreen(
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         hasStoragePermission = allGranted
+    }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    hasNotificationPermission = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                }
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    hasStoragePermission = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     BackHandler(enabled = pagerState.currentPage > 0) {
@@ -185,7 +212,8 @@ fun OnboardingScreen(
                         TextButton(
                             onClick = {
                                 scope.launch {
-                                    pagerState.animateScrollToPage(4)
+                                    val targetPage = if (pagerState.currentPage < 2) 2 else pagerState.currentPage + 1
+                                    pagerState.animateScrollToPage(targetPage)
                                 }
                             },
                             shape = RoundedCornerShape(14.dp),
@@ -283,14 +311,21 @@ fun OnboardingScreen(
                 )
                 3 -> Page4NotificationPermission(
                     hasPermission = hasNotificationPermission,
+                    isRequested = notifPermissionRequested,
                     onRequestPermission = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     },
                     onOpenSettings = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
+                        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                        } else {
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
                         }
                         context.startActivity(intent)
                     }
@@ -401,31 +436,37 @@ fun Page1WelcomeLanguage(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                val options = listOf(
-                    "SYSTEM" to stringResource(R.string.settings_lang_system),
-                    "ID" to stringResource(R.string.settings_lang_id),
-                    "EN" to stringResource(R.string.settings_lang_en)
-                )
+                Column(modifier = Modifier.selectableGroup()) {
+                    val options = listOf(
+                        "SYSTEM" to stringResource(R.string.settings_lang_system),
+                        "ID" to stringResource(R.string.settings_lang_id),
+                        "EN" to stringResource(R.string.settings_lang_en)
+                    )
 
-                options.forEach { (code, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable { onLangSelected(code) }
-                            .padding(vertical = 10.dp, horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = currentLang == code,
-                            onClick = { onLangSelected(code) }
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium
-                        )
+                    options.forEach { (code, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .selectable(
+                                    selected = currentLang == code,
+                                    onClick = { onLangSelected(code) },
+                                    role = androidx.compose.ui.semantics.Role.RadioButton
+                                )
+                                .padding(vertical = 10.dp, horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = currentLang == code,
+                                onClick = null
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (currentLang == code) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
@@ -650,6 +691,7 @@ fun Page3StoragePermission(
 @Composable
 fun Page4NotificationPermission(
     hasPermission: Boolean,
+    isRequested: Boolean,
     onRequestPermission: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -713,14 +755,14 @@ fun Page4NotificationPermission(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Notifications,
                         contentDescription = null,
                         tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (hasPermission) stringResource(R.string.notif_status_active)
+                        text = if (hasPermission) stringResource(R.string.onboarding_notif_active)
                         else stringResource(R.string.notif_status_need_permission),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
@@ -729,8 +771,15 @@ fun Page4NotificationPermission(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                if (!hasPermission) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (hasPermission) {
+                    Text(
+                        text = stringResource(R.string.onboarding_notif_active_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    if (!isRequested && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         Button(
                             onClick = onRequestPermission,
                             modifier = Modifier.fillMaxWidth(),
@@ -739,24 +788,29 @@ fun Page4NotificationPermission(
                             Text(stringResource(R.string.notif_btn_allow), fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                    }
-                    OutlinedButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
-                    ) {
-                        Text(stringResource(R.string.notif_btn_settings), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = stringResource(R.string.notif_denied_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        OutlinedButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(stringResource(R.string.onboarding_btn_open_settings), fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = stringResource(R.string.onboarding_notif_disabled_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = stringResource(R.string.notif_denied_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }
@@ -830,57 +884,67 @@ fun Page5SummaryQuality(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onQualitySelected("STANDARD") }
-                        .padding(vertical = 6.dp, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = currentQuality == "STANDARD",
-                        onClick = { onQualitySelected("STANDARD") }
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.quality_standard),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                Column(modifier = Modifier.selectableGroup()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .selectable(
+                                selected = currentQuality == "STANDARD",
+                                onClick = { onQualitySelected("STANDARD") },
+                                role = androidx.compose.ui.semantics.Role.RadioButton
+                            )
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = currentQuality == "STANDARD",
+                            onClick = null
                         )
-                        Text(
-                            text = stringResource(R.string.quality_standard_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.quality_standard),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = stringResource(R.string.quality_standard_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onQualitySelected("HD") }
-                        .padding(vertical = 6.dp, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = currentQuality == "HD",
-                        onClick = { onQualitySelected("HD") }
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.quality_hd),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .selectable(
+                                selected = currentQuality == "HD",
+                                onClick = { onQualitySelected("HD") },
+                                role = androidx.compose.ui.semantics.Role.RadioButton
+                            )
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = currentQuality == "HD",
+                            onClick = null
                         )
-                        Text(
-                            text = stringResource(R.string.quality_hd_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.quality_hd),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = stringResource(R.string.quality_hd_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

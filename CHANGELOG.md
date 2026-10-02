@@ -5,6 +5,27 @@ Format follows standard versioning practices in bilingual format (English & Baha
 
 ---
 
+## [1.1.0] - 2026-10-02
+
+### English
+
+#### Added
+- Media3 audio focus management across built-in video and audio players (pauses on incoming calls or audio noisy events).
+- Accessible slideshow photo grid with standard 48dp touch targets, semantic checkbox roles, and custom accessibility actions.
+- Unified media routing resolver for Home and Library screens, preventing blank playback states.
+- 3-state notification permission onboarding flow with live resume sync and granular settings navigation.
+- Cancel and Retry mechanisms for URL resolution on Home screen with cancellable OkHttp network requests.
+- Dynamic version display linked directly to `BuildConfig.VERSION_NAME`.
+- WCAG AA compliant color contrast tokens across light and dark themes.
+- Enhanced clipboard filtering ignoring long logs and multi-line text, with sensitive clipboard flags on API 33+.
+
+#### Changed
+- Optimized background animations (Vinyl rotation & Shimmer) to eliminate unnecessary recompositions.
+- Background asynchronous thumbnail loading on `Dispatchers.IO` for smoother library scrolling.
+- Reset gallery deletion toggles per modal dialog to prevent unintended file removals.
+
+---
+
 ## [1.0.0] - 2026-09-30
 
 ### English

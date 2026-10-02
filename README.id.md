@@ -86,7 +86,8 @@ Cocokkan nilai hash yang dihasilkan dengan isi berkas `.sha256` yang disediakan.
 
 - **Tanpa Analitik:** Truedown tidak menyertakan SDK analitik pihak ketiga atau pelacak data.
 - **Tanpa Akun:** Tidak memerlukan pendaftaran atau login.
-- **Tanpa Cloud Upload:** Seluruh proses pengunduhan berjalan langsung dari perangkat pengguna.
+- **Keterbukaan Layanan Pihak Ketiga:** Link yang kamu tempel atau bagikan dikirim ke layanan pihak ketiga (TikWM) untuk mengambil informasi media dan tautan unduhan; Truedown tidak mengirim data pribadi lainnya.
+- **Penyimpanan Lokal:** Seluruh berkas unduhan, basis data riwayat, dan preferensi aplikasi disimpan secara lokal di perangkat pengguna.
 
 ---
 

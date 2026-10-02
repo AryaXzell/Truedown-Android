@@ -252,14 +252,22 @@ fun MainAppContent(
                     )
                 }
                 is AppScreen.Home -> {
+                    val context = androidx.compose.ui.platform.LocalContext.current
                     HomeScreen(
                         viewModel = viewModel,
                         onNavigateToLibrary = { viewModel.navigateTo(AppScreen.Library) },
                         onNavigateToItemDetail = { postWithMedia ->
-                            if (postWithMedia.post.type == "VIDEO" || postWithMedia.post.type == PostType.VIDEO.name) {
-                                viewModel.navigateTo(AppScreen.VideoPlayer(postWithMedia))
-                            } else {
-                                viewModel.navigateTo(AppScreen.Library)
+                            when (val target = com.aryaxzell.truedown.domain.model.resolveOpenTarget(postWithMedia)) {
+                                is com.aryaxzell.truedown.domain.model.OpenTarget.Video -> viewModel.navigateTo(AppScreen.VideoPlayer(target.postWithMedia))
+                                is com.aryaxzell.truedown.domain.model.OpenTarget.Audio -> viewModel.navigateTo(AppScreen.AudioPlayer(target.postWithMedia))
+                                is com.aryaxzell.truedown.domain.model.OpenTarget.Slideshow -> viewModel.navigateTo(AppScreen.Library)
+                                is com.aryaxzell.truedown.domain.model.OpenTarget.NotFound -> {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        context.getString(R.string.player_media_not_found),
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
                         }
                     )

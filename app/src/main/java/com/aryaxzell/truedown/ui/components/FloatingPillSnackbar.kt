@@ -55,14 +55,22 @@ fun FloatingPillSnackbar(
     snackbarData: SnackbarData,
     modifier: Modifier = Modifier
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(snackbarData) {
-        val autoDismissMs = when (snackbarData.visuals.duration) {
-            SnackbarDuration.Short -> 3000L
-            SnackbarDuration.Long -> 6000L
-            SnackbarDuration.Indefinite -> Long.MAX_VALUE
+        val baseMs = when (snackbarData.visuals.duration) {
+            SnackbarDuration.Short -> 4000
+            SnackbarDuration.Long -> 10000
+            SnackbarDuration.Indefinite -> Int.MAX_VALUE
         }
-        if (autoDismissMs < Long.MAX_VALUE) {
-            delay(autoDismissMs)
+        if (baseMs < Int.MAX_VALUE) {
+            val a11yManager = context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as? android.view.accessibility.AccessibilityManager
+            val flags = if (snackbarData.visuals.actionLabel != null) {
+                android.view.accessibility.AccessibilityManager.FLAG_CONTENT_CONTROLS or android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT
+            } else {
+                android.view.accessibility.AccessibilityManager.FLAG_CONTENT_TEXT
+            }
+            val timeout = a11yManager?.getRecommendedTimeoutMillis(baseMs, flags)?.toLong() ?: baseMs.toLong()
+            delay(timeout)
             snackbarData.dismiss()
         }
     }

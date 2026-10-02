@@ -164,6 +164,11 @@ fun DeveloperLogsDialog(
                             val formattedText = AppLogger.getFormattedLogText()
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                             val clip = ClipData.newPlainText("Truedown App Logs", formattedText)
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                clip.description.extras = android.os.PersistableBundle().apply {
+                                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                                }
+                            }
                             clipboard?.setPrimaryClip(clip)
                             Toast.makeText(context, "Log berhasil disalin ke clipboard", Toast.LENGTH_SHORT).show()
                         },
@@ -244,7 +249,7 @@ fun DeveloperLogsDialog(
 private fun LogEntryCard(log: LogEntry) {
     val (badgeBg, badgeText) = when (log.level.uppercase()) {
         "ERROR" -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-        "WARN" -> Color(0xFFFFE0B2) to Color(0xFFE65100)
+        "WARN" -> Color(0xFFFFE0B2) to Color(0xFF8D2F00)
         "INFO" -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
         else -> MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurfaceVariant
     }

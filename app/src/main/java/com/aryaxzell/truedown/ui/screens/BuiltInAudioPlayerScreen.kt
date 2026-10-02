@@ -1,6 +1,7 @@
 package com.aryaxzell.truedown.ui.screens
 
 import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -20,20 +21,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.Forward10
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,16 +57,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -84,20 +89,68 @@ fun BuiltInAudioPlayerScreen(
     val audioMediaItem = postWithMedia.mediaItems.firstOrNull { it.kind == MediaKind.AUDIO.name || it.kind == "AUDIO" }
     val uriString = audioMediaItem?.mediaStoreUri ?: ""
 
+    if (uriString.isBlank()) {
+        BackHandler { onClose() }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.player_media_not_found),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onClose,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(text = stringResource(R.string.player_btn_close))
+                }
+            }
+        }
+        return
+    }
+
     var isPlaying by remember { mutableStateOf(true) }
     var isEnded by remember { mutableStateOf(false) }
+    var isPlayerReady by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(1L) }
+    var isDraggingSlider by remember { mutableStateOf(false) }
+    var sliderDragPosition by remember { mutableFloatStateOf(0f) }
 
     val exoPlayer = remember {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
         ExoPlayer.Builder(context).build().apply {
-            if (uriString.isNotBlank()) {
-                val item = MediaItem.fromUri(Uri.parse(uriString))
-                setMediaItem(item)
-                repeatMode = Player.REPEAT_MODE_OFF
-                prepare()
-                playWhenReady = true
-            }
+            setAudioAttributes(audioAttributes, true)
+            setHandleAudioBecomingNoisy(true)
+            val item = MediaItem.fromUri(Uri.parse(uriString))
+            setMediaItem(item)
+            repeatMode = Player.REPEAT_MODE_OFF
+            prepare()
+            playWhenReady = true
+
             addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
@@ -106,6 +159,7 @@ fun BuiltInAudioPlayerScreen(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (playbackState == Player.STATE_READY) {
                         duration = this@apply.duration.coerceAtLeast(1L)
+                        isPlayerReady = true
                         isEnded = false
                     } else if (playbackState == Player.STATE_ENDED) {
                         isEnded = true
@@ -116,21 +170,32 @@ fun BuiltInAudioPlayerScreen(
         }
     }
 
-    // Infinite rotation animation for vinyl disc when playing
-    val infiniteTransition = rememberInfiniteTransition(label = "vinyl_rotate")
-    val rotationAngle by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "vinyl_angle"
-    )
+    val reduceMotion = remember {
+        try {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    val rotationAngle by if (isPlaying && !reduceMotion) {
+        val infiniteTransition = rememberInfiniteTransition(label = "vinyl_rotate")
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 8000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "vinyl_angle"
+        )
+    } else {
+        remember { mutableFloatStateOf(0f) }
+    }
 
     LaunchedEffect(exoPlayer) {
         while (true) {
-            if (exoPlayer.isPlaying) {
+            if (exoPlayer.isPlaying && !isDraggingSlider) {
                 currentPosition = exoPlayer.currentPosition
                 duration = exoPlayer.duration.coerceAtLeast(1L)
             }
@@ -187,7 +252,7 @@ fun BuiltInAudioPlayerScreen(
                 modifier = Modifier
                     .size(240.dp)
                     .clip(CircleShape)
-                    .rotate(if (isPlaying) rotationAngle else 0f),
+                    .graphicsLayer { rotationZ = rotationAngle },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 shadowElevation = 12.dp,
@@ -219,10 +284,10 @@ fun BuiltInAudioPlayerScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.Audiotrack,
+                                imageVector = Icons.Default.MusicNote,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                     }
@@ -232,11 +297,11 @@ fun BuiltInAudioPlayerScreen(
             Spacer(modifier = Modifier.height(36.dp))
 
             Text(
-                text = postWithMedia.post.title.ifBlank { "Audio TikTok" },
+                text = postWithMedia.post.title.ifBlank { "TikTok Audio" },
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onBackground
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -249,14 +314,34 @@ fun BuiltInAudioPlayerScreen(
 
             Spacer(modifier = Modifier.height(36.dp))
 
+            val displayPos = if (isDraggingSlider) (sliderDragPosition * duration).toLong() else currentPosition
+            val sliderValue = if (!isPlayerReady) 0f else if (isDraggingSlider) sliderDragPosition else (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+            val sliderDesc = stringResource(R.string.a11y_audio_slider_desc)
+            val sliderState = stringResource(
+                R.string.a11y_slider_state_format,
+                formatTime(if (isPlayerReady) displayPos else 0L),
+                formatTime(if (isPlayerReady) duration else 0L)
+            )
+
             Slider(
-                value = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f),
+                value = sliderValue,
                 onValueChange = { frac ->
-                    val seekPos = (frac * duration).toLong()
+                    isDraggingSlider = true
+                    sliderDragPosition = frac
+                },
+                onValueChangeFinished = {
+                    val seekPos = (sliderDragPosition * duration).toLong()
                     exoPlayer.seekTo(seekPos)
                     currentPosition = seekPos
+                    isDraggingSlider = false
                 },
-                modifier = Modifier.fillMaxWidth(),
+                enabled = isPlayerReady,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = sliderDesc
+                        stateDescription = sliderState
+                    },
                 colors = SliderDefaults.colors(
                     thumbColor = MaterialTheme.colorScheme.primary,
                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -269,13 +354,13 @@ fun BuiltInAudioPlayerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = formatTime(currentPosition),
+                    text = formatTime(if (isPlayerReady) displayPos else 0L),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = formatTime(duration),
+                    text = formatTime(if (isPlayerReady) duration else 0L),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

@@ -79,3 +79,49 @@ data class DownloadProgress(
     val error: String? = null,
     val startEpochMs: Long = System.currentTimeMillis()
 )
+
+sealed class OpenTarget {
+    data class Video(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
+    data class Audio(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
+    data class Slideshow(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
+    object NotFound : OpenTarget()
+}
+
+fun resolveOpenTarget(postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia): OpenTarget {
+    val items = postWithMedia.mediaItems
+
+    val hasDoneVideo = items.any {
+        (it.kind == MediaKind.VIDEO.name || it.kind == "VIDEO") &&
+        (it.status == MediaStatus.DONE.name || it.status == "DONE") &&
+        it.mediaStoreUri.isNotBlank()
+    }
+    if (hasDoneVideo) {
+        return OpenTarget.Video(postWithMedia)
+    }
+
+    val hasDoneAudio = items.any {
+        (it.kind == MediaKind.AUDIO.name || it.kind == "AUDIO") &&
+        (it.status == MediaStatus.DONE.name || it.status == "DONE") &&
+        it.mediaStoreUri.isNotBlank()
+    }
+
+    val hasPhotos = items.any {
+        (it.kind == MediaKind.PHOTO.name || it.kind == "PHOTO") &&
+        (it.status == MediaStatus.DONE.name || it.status == "DONE") &&
+        it.mediaStoreUri.isNotBlank()
+    } || postWithMedia.post.type == PostType.SLIDESHOW.name || postWithMedia.post.type == "SLIDESHOW"
+
+    if (hasDoneAudio && !hasPhotos) {
+        return OpenTarget.Audio(postWithMedia)
+    }
+
+    if (hasPhotos) {
+        return OpenTarget.Slideshow(postWithMedia)
+    }
+
+    if (hasDoneAudio) {
+        return OpenTarget.Audio(postWithMedia)
+    }
+
+    return OpenTarget.NotFound
+}

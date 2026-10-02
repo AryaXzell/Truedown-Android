@@ -188,4 +188,24 @@
     <string name="notif_downloading">Sedang Mengunduh…</string>
     <string name="notif_download_success">Unduhan Selesai</string>
     <string name="notif_download_failed">Unduhan Gagal</string>
+
+    <!-- Part 2 Additions -->
+    <string name="delete_files_failed">Catatan dihapus, tapi file tidak dapat dihapus dari sini. Hapus lewat galeri ya.</string>
+    <string name="home_resolve_cancel">Batal</string>
+    <string name="home_resolve_retry">Coba lagi</string>
+    <string name="settings_app_version_format">Versi %1$s</string>
+    <string name="player_media_not_found">File media tidak ditemukan atau telah dihapus.</string>
+    <string name="player_btn_close">Tutup</string>
+    <string name="a11y_open_photo">Buka foto</string>
+    <string name="a11y_photo_item_desc">Foto %1$d dari %2$d</string>
+    <string name="a11y_video_slider_desc">Posisi pemutaran video</string>
+    <string name="a11y_audio_slider_desc">Posisi pemutaran audio</string>
+    <string name="a11y_slider_state_format">%1$s dari %2$s</string>
+    <string name="a11y_btn_paste">Tempel tautan</string>
+    <string name="a11y_progress_downloading">Mengunduh %1$d konten</string>
+    <string name="a11y_view_in_library">Lihat di Library</string>
+    <string name="onboarding_notif_active">Notifikasi Aktif</string>
+    <string name="onboarding_notif_active_desc">Anda akan menerima progres pengunduhan secara langsung.</string>
+    <string name="onboarding_notif_disabled_note">Progres unduhan tidak akan tampil di panel notifikasi.</string>
+    <string name="onboarding_btn_open_settings">Buka Pengaturan</string>
 </resources>

@@ -113,12 +113,3 @@ fun TruedownTheme(
         content = content
     )
 }
-
-@Composable
-fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
-) {
-    TruedownTheme(darkTheme = darkTheme, dynamicColor = dynamicColor, content = content)
-}

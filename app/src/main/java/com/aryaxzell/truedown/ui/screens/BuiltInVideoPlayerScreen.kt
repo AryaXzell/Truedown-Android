@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,9 +59,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -86,11 +94,53 @@ fun BuiltInVideoPlayerScreen(
     val videoMediaItem = postWithMedia.mediaItems.firstOrNull { it.kind == MediaKind.VIDEO.name || it.kind == "VIDEO" }
     val uriString = videoMediaItem?.mediaStoreUri ?: ""
 
+    if (uriString.isBlank()) {
+        BackHandler { onClose() }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.player_media_not_found),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onClose,
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(text = stringResource(R.string.player_btn_close))
+                }
+            }
+        }
+        return
+    }
+
     var isPlaying by remember { mutableStateOf(true) }
+    var isPlayerReady by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(1L) }
     var showControls by remember { mutableStateOf(true) }
     var isLandscape by remember { mutableStateOf(false) }
+    var isDraggingSlider by remember { mutableStateOf(false) }
+    var sliderDragPosition by remember { mutableFloatStateOf(0f) }
 
     val exoPlayer = remember {
         val loadControl = DefaultLoadControl.Builder()
@@ -104,16 +154,22 @@ fun BuiltInVideoPlayerScreen(
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+
         ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
             .build().apply {
-                if (uriString.isNotBlank()) {
-                    val mediaItem = MediaItem.fromUri(Uri.parse(uriString))
-                    setMediaItem(mediaItem)
-                    repeatMode = Player.REPEAT_MODE_ALL
-                    prepare()
-                    playWhenReady = true
-                }
+                setAudioAttributes(audioAttributes, true)
+                setHandleAudioBecomingNoisy(true)
+                val mediaItem = MediaItem.fromUri(Uri.parse(uriString))
+                setMediaItem(mediaItem)
+                repeatMode = Player.REPEAT_MODE_ALL
+                prepare()
+                playWhenReady = true
+
                 addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(playing: Boolean) {
                         isPlaying = playing
@@ -122,6 +178,7 @@ fun BuiltInVideoPlayerScreen(
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_READY) {
                             duration = this@apply.duration.coerceAtLeast(1L)
+                            isPlayerReady = true
                         }
                     }
                 })
@@ -130,16 +187,16 @@ fun BuiltInVideoPlayerScreen(
 
     LaunchedEffect(exoPlayer) {
         while (true) {
-            if (exoPlayer.isPlaying) {
+            if (exoPlayer.isPlaying && !isDraggingSlider) {
                 currentPosition = exoPlayer.currentPosition
                 duration = exoPlayer.duration.coerceAtLeast(1L)
             }
-            delay(500)
+            delay(300)
         }
     }
 
-    LaunchedEffect(showControls) {
-        if (showControls) {
+    LaunchedEffect(showControls, isDraggingSlider) {
+        if (showControls && !isDraggingSlider) {
             delay(4000)
             showControls = false
         }
@@ -339,19 +396,39 @@ fun BuiltInVideoPlayerScreen(
                     .navigationBarsPadding()
                     .padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 32.dp)
             ) {
+                val displayPos = if (isDraggingSlider) (sliderDragPosition * duration).toLong() else currentPosition
+                val sliderValue = if (!isPlayerReady) 0f else if (isDraggingSlider) sliderDragPosition else (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                val sliderDesc = stringResource(R.string.a11y_video_slider_desc)
+                val sliderState = stringResource(
+                    R.string.a11y_slider_state_format,
+                    formatTime(if (isPlayerReady) displayPos else 0L),
+                    formatTime(if (isPlayerReady) duration else 0L)
+                )
+
                 Slider(
-                    value = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f),
+                    value = sliderValue,
                     onValueChange = { frac ->
-                        val seekPos = (frac * duration).toLong()
+                        isDraggingSlider = true
+                        sliderDragPosition = frac
+                    },
+                    onValueChangeFinished = {
+                        val seekPos = (sliderDragPosition * duration).toLong()
                         exoPlayer.seekTo(seekPos)
                         currentPosition = seekPos
+                        isDraggingSlider = false
                     },
+                    enabled = isPlayerReady,
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
                         activeTrackColor = MaterialTheme.colorScheme.primary,
                         inactiveTrackColor = Color.White.copy(alpha = 0.35f)
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            contentDescription = sliderDesc
+                            stateDescription = sliderState
+                        }
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -361,13 +438,13 @@ fun BuiltInVideoPlayerScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = formatTime(currentPosition),
+                        text = formatTime(if (isPlayerReady) displayPos else 0L),
                         color = Color.White.copy(alpha = 0.9f),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = formatTime(duration),
+                        text = formatTime(if (isPlayerReady) duration else 0L),
                         color = Color.White.copy(alpha = 0.9f),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold
