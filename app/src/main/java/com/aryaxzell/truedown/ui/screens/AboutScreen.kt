@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -72,6 +73,8 @@ import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.ui.components.ChangelogModal
 import com.aryaxzell.truedown.util.NightlyUpdateManager
 import com.aryaxzell.truedown.util.NightlyUpdateState
+import com.aryaxzell.truedown.util.ReleaseUpdateManager
+import com.aryaxzell.truedown.util.ReleaseUpdateState
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -83,6 +86,7 @@ fun AboutScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val updateState by NightlyUpdateManager.updateState.collectAsState()
+    val releaseUpdateState by ReleaseUpdateManager.updateState.collectAsState()
 
     var showNightlyOptionsDialog by remember { mutableStateOf(false) }
     var showChangelogModal by remember { mutableStateOf(false) }
@@ -198,22 +202,20 @@ fun AboutScreen(
 
             // Saluran Pembaruan Versi Section
             AboutGroupCard(title = "Saluran Pembaruan Versi") {
-                // Saluran Stabil (Official Release)
+                // Saluran Stabil (Official Release In-App Update)
                 AboutClickableRow(
                     icon = Icons.Default.CheckCircle,
                     title = "Saluran Stabil (Stable Release)",
-                    subtitle = "Versi rilis resmi stabil — Periksa di GitHub Releases",
+                    subtitle = "Periksa dan pasang pembaruan rilis resmi langsung di dalam app",
                     onClick = {
-                        val browserIntent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://github.com/AryaXzell/Truedown-Android/releases")
-                        )
-                        context.startActivity(browserIntent)
+                        scope.launch {
+                            ReleaseUpdateManager.checkForReleaseUpdate()
+                        }
                     },
                     testTag = "about_check_update_stable_row",
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     iconTint = MaterialTheme.colorScheme.primary,
-                    showExternalIcon = true
+                    showExternalIcon = false
                 )
 
                 HorizontalDivider(
@@ -458,6 +460,7 @@ fun AboutScreen(
             title = {
                 Text(
                     text = when (currentState) {
+                        is NightlyUpdateState.Checking -> "Memeriksa Update Nightly"
                         is NightlyUpdateState.Downloading -> "Mengunduh Nightly Update"
                         is NightlyUpdateState.Extracting -> "Mengekstrak Artefak ZIP"
                         is NightlyUpdateState.ReadyToInstall -> "Siap Memasang APK"
@@ -475,6 +478,21 @@ fun AboutScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     when (currentState) {
+                        is NightlyUpdateState.Checking -> {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Memeriksa ketersediaan build Nightly terbaru di GitHub...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
                         is NightlyUpdateState.Downloading -> {
                             val percent = (currentState.progress * 100).toInt()
 
@@ -601,8 +619,9 @@ fun AboutScreen(
                         }
 
                         is NightlyUpdateState.ReadyToInstall -> {
+                            val abiText = if (currentState.selectedAbi.isNotBlank()) " (Arsitektur: ${currentState.selectedAbi})" else ""
                             Text(
-                                text = "File APK berhasil diekstrak dan siap dipasang. Menghubungkan ke installer paket Android...",
+                                text = "File APK $abiText berhasil diekstrak dan disesuaikan untuk perangkat Anda. Menghubungkan ke installer paket Android...",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
@@ -658,6 +677,227 @@ fun AboutScreen(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        )
+    }
+
+    // In-App Progress Dialog for Release Update
+    if (releaseUpdateState !is ReleaseUpdateState.Idle) {
+        val relState = releaseUpdateState
+        AlertDialog(
+            onDismissRequest = {
+                if (relState is ReleaseUpdateState.Error || relState is ReleaseUpdateState.ReadyToInstall || relState is ReleaseUpdateState.UpToDate) {
+                    ReleaseUpdateManager.resetState()
+                    ReleaseUpdateManager.cleanupUpdateFiles(context)
+                }
+            },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Icon(
+                    imageVector = when (relState) {
+                        is ReleaseUpdateState.Error -> Icons.Default.Warning
+                        is ReleaseUpdateState.ReadyToInstall, is ReleaseUpdateState.UpToDate -> Icons.Default.CheckCircle
+                        is ReleaseUpdateState.UpdateAvailable -> Icons.Default.SystemUpdate
+                        else -> Icons.Default.Download
+                    },
+                    contentDescription = null,
+                    tint = when (relState) {
+                        is ReleaseUpdateState.Error -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = when (relState) {
+                        is ReleaseUpdateState.Checking -> "Memeriksa Rilis Resmi"
+                        is ReleaseUpdateState.UpToDate -> "Aplikasi Sudah Terbaru"
+                        is ReleaseUpdateState.UpdateAvailable -> "Pembaruan Rilis Ditemukan (${relState.tag})"
+                        is ReleaseUpdateState.Downloading -> "Mengunduh Rilis ${relState.progress * 100}%"
+                        is ReleaseUpdateState.ReadyToInstall -> "Siap Memasang APK Rilis"
+                        is ReleaseUpdateState.Error -> "Gagal Memperbarui Rilis"
+                        else -> "Pembaruan Versi Rilis"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    when (relState) {
+                        is ReleaseUpdateState.Checking -> {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(36.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "Menghubungkan ke GitHub Releases API...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        is ReleaseUpdateState.UpToDate -> {
+                            Text(
+                                text = "Aplikasi Truedown Anda sudah menggunakan versi rilis stabil paling baru (${relState.currentVersion}).",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        is ReleaseUpdateState.UpdateAvailable -> {
+                            Text(
+                                text = relState.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow
+                            ) {
+                                Text(
+                                    text = relState.releaseNotes.take(300) + if (relState.releaseNotes.length > 300) "..." else "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Arsitektur HP: ${relState.selectedAbi} • Ukuran File: ${formatBytes(relState.apkSizeBytes)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+
+                        is ReleaseUpdateState.Downloading -> {
+                            val percent = (relState.progress * 100).toInt()
+                            Text(
+                                text = "$percent%",
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            LinearProgressIndicator(
+                                progress = { relState.progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(10.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Terunduh", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                        Text("${formatBytes(relState.downloadedBytes)} / ${formatBytes(relState.totalBytes)}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Kecepatan", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                        Text("${formatBytes(relState.speedBytesPerSec)}/s", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            }
+                        }
+
+                        is ReleaseUpdateState.ReadyToInstall -> {
+                            Text(
+                                text = "File APK Rilis Resmi (${relState.selectedAbi}) berhasil diunduh. Menghubungkan ke installer paket Android...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        is ReleaseUpdateState.Error -> {
+                            Text(
+                                text = relState.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        else -> {}
+                    }
+                }
+            },
+            confirmButton = {
+                when (relState) {
+                    is ReleaseUpdateState.UpdateAvailable -> {
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    ReleaseUpdateManager.downloadAndInstallRelease(context, relState)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Unduh & Pasang Sekarang", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    is ReleaseUpdateState.ReadyToInstall -> {
+                        Button(
+                            onClick = {
+                                ReleaseUpdateManager.installApk(context, relState.apkFile)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Buka Installer APK", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    is ReleaseUpdateState.UpToDate, is ReleaseUpdateState.Error -> {
+                        Button(
+                            onClick = {
+                                ReleaseUpdateManager.resetState()
+                                ReleaseUpdateManager.cleanupUpdateFiles(context)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Tutup", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    else -> {}
+                }
+            },
+            dismissButton = {
+                if (relState is ReleaseUpdateState.UpdateAvailable) {
+                    TextButton(
+                        onClick = {
+                            ReleaseUpdateManager.resetState()
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Batal", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

@@ -242,7 +242,7 @@ jobs:
           *Review CHANGELOG.md for full list of changes in this version.*
           EOF
 
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -250,4 +250,8 @@ jobs:
             release-assets/*.apk \
             release-assets/*.sha256 \
             --title "Truedown Android ${{ steps.version.outputs.tag_name }}" \
-            --notes-file release_body.md
+            --notes-file release_body.md || \
+          gh release upload "${{ steps.version.outputs.tag_name }}" \
+            release-assets/*.apk \
+            release-assets/*.sha256 \
+            --clobber

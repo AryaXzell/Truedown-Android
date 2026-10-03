@@ -29,6 +29,9 @@ class UserPreferencesRepository(private val context: Context) {
         val KEY_BATTERY_SAVER = booleanPreferencesKey("battery_saver")
         val KEY_WIFI_ONLY = booleanPreferencesKey("wifi_only")
         val KEY_AUTO_DOWNLOAD_ON_DETECT = booleanPreferencesKey("auto_download_on_detect")
+        val KEY_CUSTOM_DOWNLOAD_URI = stringPreferencesKey("custom_download_uri")
+        val KEY_CUSTOM_DOWNLOAD_NAME = stringPreferencesKey("custom_download_name")
+        val KEY_AUTO_CLEAR_CACHE = booleanPreferencesKey("auto_clear_cache")
     }
 
     val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
@@ -46,7 +49,10 @@ class UserPreferencesRepository(private val context: Context) {
             dohProvider = preferences[KEY_DOH_PROVIDER] ?: "SYSTEM",
             batterySaver = preferences[KEY_BATTERY_SAVER] ?: false,
             wifiOnly = preferences[KEY_WIFI_ONLY] ?: false,
-            autoDownloadOnDetect = preferences[KEY_AUTO_DOWNLOAD_ON_DETECT] ?: false
+            autoDownloadOnDetect = preferences[KEY_AUTO_DOWNLOAD_ON_DETECT] ?: false,
+            customDownloadDirectoryUri = preferences[KEY_CUSTOM_DOWNLOAD_URI] ?: "",
+            customDownloadDirectoryName = preferences[KEY_CUSTOM_DOWNLOAD_NAME] ?: "",
+            autoClearCacheOnExit = preferences[KEY_AUTO_CLEAR_CACHE] ?: false
         )
     }
 
@@ -104,5 +110,16 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setAutoDownloadOnDetect(enabled: Boolean) {
         context.dataStore.edit { it[KEY_AUTO_DOWNLOAD_ON_DETECT] = enabled }
+    }
+
+    suspend fun setCustomDownloadDirectory(uri: String, name: String) {
+        context.dataStore.edit {
+            it[KEY_CUSTOM_DOWNLOAD_URI] = uri
+            it[KEY_CUSTOM_DOWNLOAD_NAME] = name
+        }
+    }
+
+    suspend fun setAutoClearCacheOnExit(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_AUTO_CLEAR_CACHE] = enabled }
     }
 }

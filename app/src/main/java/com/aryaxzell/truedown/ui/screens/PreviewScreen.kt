@@ -77,6 +77,8 @@ import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.aryaxzell.truedown.R
+import com.aryaxzell.truedown.ui.components.CaptionHashtagCard
+import com.aryaxzell.truedown.ui.components.QuickMediaPreviewCard
 import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ResolvedPost
@@ -310,64 +312,18 @@ fun PreviewScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Author Profile Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = 2.dp,
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = post.authorName.ifBlank { "TikTok Creator" },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "@${post.authorHandle.ifBlank { "tiktok" }}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+            // Quick Media Preview Card (Inline Player / Slideshow / Audio Preview)
+            QuickMediaPreviewCard(post = post)
 
-                    if (post.title.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = post.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 22.sp
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Caption & Hashtag Extractor Card
+            CaptionHashtagCard(
+                authorName = post.authorName,
+                authorHandle = post.authorHandle,
+                caption = post.title,
+                sourceUrl = post.sourceUrl
+            )
 
             // Factual Video File Size Info Card (Aesthetic M3 Pill)
             val videoSizePillText = remember(post) {

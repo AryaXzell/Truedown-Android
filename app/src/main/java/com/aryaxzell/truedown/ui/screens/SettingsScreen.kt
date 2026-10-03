@@ -6,7 +6,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Dns
@@ -83,6 +87,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aryaxzell.truedown.R
+import com.aryaxzell.truedown.ui.components.StorageCleanerModal
 import com.aryaxzell.truedown.ui.DeleteResult
 import com.aryaxzell.truedown.ui.MainViewModel
 import kotlinx.coroutines.launch
@@ -108,6 +113,26 @@ fun SettingsScreen(
     var showDuplicateDialog by remember { mutableStateOf(false) }
     var showDohDialog by remember { mutableStateOf(false) }
     var showDeveloperLogsDialog by remember { mutableStateOf(false) }
+    var showStorageCleanerModal by remember { mutableStateOf(false) }
+
+    val safFolderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                context.contentResolver.takePersistableUriPermission(uri, flags)
+
+                val docFile = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
+                val folderName = docFile?.name ?: "Folder Kustom"
+
+                viewModel.updateCustomDownloadDirectory(uri.toString(), folderName)
+                Toast.makeText(context, "Folder unduhan diubah ke: $folderName", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Gagal menetapkan folder: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     BackHandler {
         onBack()
@@ -337,6 +362,41 @@ fun SettingsScreen(
                     testTag = "settings_auto_download_switch",
                     iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                     iconTint = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            // Card: Penyimpanan & Cache
+            SettingsGroupCard(title = "Penyimpanan & Cache") {
+                // Folder Unduhan Kustom
+                val folderSubtitle = if (preferences.customDownloadDirectoryName.isNotBlank()) {
+                    preferences.customDownloadDirectoryName
+                } else {
+                    "Bawaan Sistem (Download/Truedown)"
+                }
+                SettingsClickableRow(
+                    icon = Icons.Default.Folder,
+                    title = "Folder Lokasi Unduhan",
+                    subtitle = folderSubtitle,
+                    onClick = { safFolderLauncher.launch(null) },
+                    testTag = "settings_custom_folder_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Pembersih Cache Media
+                SettingsClickableRow(
+                    icon = Icons.Default.CleaningServices,
+                    title = "Pembersih Cache Media",
+                    subtitle = "Bersihkan berkas temporary dan cache pratinjau media",
+                    onClick = { showStorageCleanerModal = true },
+                    testTag = "settings_storage_cleaner_row",
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconTint = MaterialTheme.colorScheme.tertiary
                 )
             }
 
@@ -974,6 +1034,15 @@ fun SettingsScreen(
     if (showDeveloperLogsDialog) {
         com.aryaxzell.truedown.ui.components.DeveloperLogsDialog(
             onDismiss = { showDeveloperLogsDialog = false }
+        )
+    }
+
+    // Storage Cleaner Modal
+    if (showStorageCleanerModal) {
+        StorageCleanerModal(
+            autoClearOnExit = preferences.autoClearCacheOnExit,
+            onToggleAutoClear = { enabled -> viewModel.updateAutoClearCacheOnExit(enabled) },
+            onDismiss = { showStorageCleanerModal = false }
         )
     }
 }

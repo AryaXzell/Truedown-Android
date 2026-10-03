@@ -14,5 +14,8 @@ data class UserPreferences(
     val dohProvider: String = "SYSTEM",
     val batterySaver: Boolean = false,
     val wifiOnly: Boolean = false,
-    val autoDownloadOnDetect: Boolean = false
+    val autoDownloadOnDetect: Boolean = false,
+    val customDownloadDirectoryUri: String = "",
+    val customDownloadDirectoryName: String = "",
+    val autoClearCacheOnExit: Boolean = false
 )

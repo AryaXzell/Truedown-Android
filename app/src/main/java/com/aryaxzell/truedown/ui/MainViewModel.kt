@@ -536,6 +536,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateCustomDownloadDirectory(uri: String, name: String) {
+        viewModelScope.launch {
+            userPreferencesRepository.setCustomDownloadDirectory(uri, name)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "Custom download directory set to $name ($uri)")
+        }
+    }
+
+    fun updateAutoClearCacheOnExit(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setAutoClearCacheOnExit(enabled)
+            com.aryaxzell.truedown.util.AppLogger.i("MainViewModel", "Auto clear cache on exit set to $enabled")
+        }
+    }
+
     fun updateDohProvider(providerKey: String) {
         viewModelScope.launch {
             userPreferencesRepository.setDohProvider(providerKey)
