@@ -33,7 +33,8 @@ sealed class ReleaseUpdateState {
         val releaseNotes: String,
         val apkUrl: String,
         val apkSizeBytes: Long,
-        val selectedAbi: String
+        val selectedAbi: String,
+        val sha256Url: String = ""
     ) : ReleaseUpdateState()
     data class Downloading(
         val progress: Float,
@@ -42,6 +43,7 @@ sealed class ReleaseUpdateState {
         val speedBytesPerSec: Long = 0L,
         val remainingSeconds: Long = -1L
     ) : ReleaseUpdateState()
+    data class Verifying(val status: String) : ReleaseUpdateState()
     data class ReadyToInstall(
         val apkFile: File,
         val selectedAbi: String = ""
@@ -127,6 +129,7 @@ object ReleaseUpdateManager {
             val deviceAbi = NightlyUpdateManager.getDeviceCpuAbi()
             val assets = json.optJSONArray("assets")
 
+            var bestApkName = ""
             var bestApkUrl = ""
             var bestApkSize = 0L
             var bestScore = -1
@@ -134,21 +137,22 @@ object ReleaseUpdateManager {
             if (assets != null) {
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
-                    val assetName = asset.optString("name", "").lowercase()
+                    val assetName = asset.optString("name", "")
                     val downloadUrl = asset.optString("browser_download_url", "")
                     val size = asset.optLong("size", 0L)
 
-                    if (assetName.endsWith(".apk") && downloadUrl.isNotBlank()) {
+                    if (assetName.endsWith(".apk", ignoreCase = true) && downloadUrl.isNotBlank()) {
                         val score = when {
-                            assetName.contains(deviceAbi.lowercase()) -> 100
-                            assetName.contains("arm64") && deviceAbi.contains("arm64") -> 95
-                            assetName.contains("v7a") && deviceAbi.contains("v7a") -> 95
-                            assetName.contains("universal") -> 80
+                            assetName.lowercase().contains(deviceAbi.lowercase()) -> 100
+                            assetName.lowercase().contains("arm64") && deviceAbi.contains("arm64") -> 95
+                            assetName.lowercase().contains("v7a") && deviceAbi.contains("v7a") -> 95
+                            assetName.lowercase().contains("universal") -> 80
                             else -> 50
                         }
 
                         if (score > bestScore) {
                             bestScore = score
+                            bestApkName = assetName
                             bestApkUrl = downloadUrl
                             bestApkSize = size
                         }
@@ -162,13 +166,27 @@ object ReleaseUpdateManager {
                 return@withContext Result.failure(Exception(err))
             }
 
+            var bestSha256Url = ""
+            if (bestApkName.isNotBlank() && assets != null) {
+                val targetShaName = "$bestApkName.sha256"
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val assetName = asset.optString("name", "")
+                    if (assetName.equals(targetShaName, ignoreCase = true)) {
+                        bestSha256Url = asset.optString("browser_download_url", "")
+                        break
+                    }
+                }
+            }
+
             val updateAvailable = ReleaseUpdateState.UpdateAvailable(
                 tag = tagName,
                 title = releaseTitle,
                 releaseNotes = releaseNotes,
                 apkUrl = bestApkUrl,
                 apkSizeBytes = bestApkSize,
-                selectedAbi = deviceAbi
+                selectedAbi = deviceAbi,
+                sha256Url = bestSha256Url
             )
 
             if (isVersionNewer(cleanLatest, cleanCurrent)) {
@@ -197,6 +215,16 @@ object ReleaseUpdateManager {
             val apkFile = File(updateDir, "truedown_release_${updateInfo.tag}_${updateInfo.selectedAbi}.apk")
 
             try {
+                // Periksa ketersediaan penyimpanan internal perangkat
+                if (!StorageUtil.hasEnoughStorageSpace(updateDir, updateInfo.apkSizeBytes)) {
+                    val availableSpaceText = android.text.format.Formatter.formatFileSize(context, StorageUtil.getAvailableStorageBytes(updateDir))
+                    val requiredSpaceText = android.text.format.Formatter.formatFileSize(context, updateInfo.apkSizeBytes + 25 * 1024 * 1024)
+                    val err = "Penyimpanan HP hampir penuh (Tersedia: $availableSpaceText). Harap kosongkan setidaknya $requiredSpaceText ruang penyimpanan internal untuk memasang update."
+                    _updateState.value = ReleaseUpdateState.Error(err)
+                    AppLogger.w("ReleaseUpdate", err)
+                    return@withContext
+                }
+
                 _updateState.value = ReleaseUpdateState.Downloading(0f, 0L, updateInfo.apkSizeBytes)
                 AppLogger.i("ReleaseUpdate", "Mengunduh langsung APK Rilis ${updateInfo.tag} (${updateInfo.selectedAbi}) dari: ${updateInfo.apkUrl}")
 
@@ -275,6 +303,48 @@ object ReleaseUpdateManager {
                     return@withContext
                 }
 
+                // 3. Verifikasi SHA-256 jika URL tersedia
+                if (updateInfo.sha256Url.isNotBlank()) {
+                    _updateState.value = ReleaseUpdateState.Verifying("Mengunduh checksum SHA-256 resmi...")
+                    AppLogger.i("ReleaseUpdate", "Mengunduh file checksum dari: ${updateInfo.sha256Url}")
+
+                    val shaRequest = Request.Builder()
+                        .url(updateInfo.sha256Url)
+                        .header("User-Agent", "Truedown-Android-App")
+                        .build()
+
+                    val shaResponse = client.newCall(shaRequest).execute()
+                    if (shaResponse.isSuccessful) {
+                        val shaBody = shaResponse.body?.string() ?: ""
+                        // Ekstrak 64 hex karakter pertama dari teks
+                        val matchResult = Regex("[a-fA-F0-9]{64}").find(shaBody)
+                        val expectedSha = matchResult?.value?.lowercase()
+
+                        if (expectedSha != null) {
+                            _updateState.value = ReleaseUpdateState.Verifying("Menghitung checksum berkas APK...")
+                            val actualSha = calculateSha256(apkFile).lowercase()
+
+                            AppLogger.i("ReleaseUpdate", "Expected SHA-256: $expectedSha")
+                            AppLogger.i("ReleaseUpdate", "Actual SHA-256: $actualSha")
+
+                            if (expectedSha != actualSha) {
+                                val err = "Integritas berkas terganggu (SHA-256 Mismatch). Silakan coba lagi."
+                                _updateState.value = ReleaseUpdateState.Error(err)
+                                AppLogger.e("ReleaseUpdate", err)
+                                if (apkFile.exists()) {
+                                    apkFile.delete()
+                                }
+                                return@withContext
+                            }
+                            AppLogger.i("ReleaseUpdate", "Verifikasi SHA-256 berhasil!")
+                        } else {
+                            AppLogger.w("ReleaseUpdate", "Format file .sha256 di GitHub tidak dikenali atau kosong")
+                        }
+                    } else {
+                        AppLogger.w("ReleaseUpdate", "Gagal mengunduh berkas checksum (HTTP ${shaResponse.code}). Melompati verifikasi.")
+                    }
+                }
+
                 _updateState.value = ReleaseUpdateState.ReadyToInstall(apkFile, updateInfo.selectedAbi)
 
                 withContext(Dispatchers.Main) {
@@ -286,6 +356,23 @@ object ReleaseUpdateManager {
                 _updateState.value = ReleaseUpdateState.Error(e.localizedMessage ?: "Gagal mengunduh berkas rilis")
             }
         }
+    }
+
+    fun calculateSha256(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { inputStream ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        val hashBytes = digest.digest()
+        val sb = StringBuilder()
+        for (b in hashBytes) {
+            sb.append(String.format("%02x", b))
+        }
+        return sb.toString()
     }
 
     fun installApk(context: Context, apkFile: File) {

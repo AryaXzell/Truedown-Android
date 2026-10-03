@@ -169,6 +169,16 @@ object NightlyUpdateManager {
                     AppLogger.i("NightlyUpdate", "Konfirmasi build aktif untuk diunduh: Run #$runId")
                 }
 
+                // 1.5. Periksa ketersediaan penyimpanan internal perangkat
+                val estimatedSize = 30L * 1024 * 1024 // Estimasi 30 MB untuk ZIP
+                if (!StorageUtil.hasEnoughStorageSpace(updateDir, estimatedSize)) {
+                    val availableSpaceText = android.text.format.Formatter.formatFileSize(context, StorageUtil.getAvailableStorageBytes(updateDir))
+                    val err = "Penyimpanan HP hampir penuh (Tersedia: $availableSpaceText). Harap kosongkan setidaknya 55 MB ruang penyimpanan internal untuk memasang update."
+                    _updateState.value = NightlyUpdateState.Error(err)
+                    AppLogger.w("NightlyUpdate", err)
+                    return@withContext
+                }
+
                 // 2. Download ZIP Artifact
                 _updateState.value = NightlyUpdateState.Downloading(0f, 0L, 0L)
                 AppLogger.i("NightlyUpdate", "Mengunduh artefak ZIP dari: $NIGHTLY_URL")
