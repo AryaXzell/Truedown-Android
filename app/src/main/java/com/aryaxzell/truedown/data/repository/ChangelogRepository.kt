@@ -109,6 +109,18 @@ object ChangelogRepository {
     fun getFallbackReleases(): List<ReleaseInfo> {
         return listOf(
             ReleaseInfo(
+                tagName = "v1.1.1",
+                name = "Truedown v1.1.1 — Pembaruan Nightly, Aksesibilitas & Perbaikan Lint",
+                publishedAt = "03/10/2026",
+                body = "• Perbaikan pengunduhan pembaruan Saluran Nightly in-app dengan fallback cerdas ke GitHub Releases.\n" +
+                        "• Penyematan anotasi Media3 UnstableApi resmi pada kartu pratinjau media cepat.\n" +
+                        "• Peningkatan aksesibilitas menyeluruh (TalkBack WCAG AA) dan throttling live region progres.\n" +
+                        "• Integritas penulisan MediaStore Scoped Storage dan pembersihan berkas lama saat unduh ulang.\n" +
+                        "• Lokalisasi lengkap string aksesibilitas untuk Bahasa Indonesia dan Bahasa Inggris.",
+                htmlUrl = "https://github.com/AryaXzell/Truedown-Android/releases",
+                isLatest = true
+            ),
+            ReleaseInfo(
                 tagName = "v1.1.0",
                 name = "Truedown v1.1.0 — Pembaruan Fitur & Stabilitas",
                 publishedAt = "02/10/2026",
@@ -118,7 +130,7 @@ object ChangelogRepository {
                         "• Manajemen alur izin notifikasi & izin instalasi in-app.\n" +
                         "• Saluran pembaruan Stabil & Nightly in-app installer.",
                 htmlUrl = "https://github.com/AryaXzell/Truedown-Android/releases",
-                isLatest = true
+                isLatest = false
             ),
             ReleaseInfo(
                 tagName = "v1.0.0",

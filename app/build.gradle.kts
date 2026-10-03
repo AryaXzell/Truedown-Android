@@ -21,7 +21,7 @@ val hasReleaseSigning = releaseKeystorePath.isNotBlank() &&
 
 val appVersionMajor = 1
 val appVersionMinor = 1
-val appVersionPatch = 0
+val appVersionPatch = 1
 val baseVersionCode = appVersionMajor * 10000 + appVersionMinor * 100 + appVersionPatch
 val appVersionName = "$appVersionMajor.$appVersionMinor.$appVersionPatch"
 
