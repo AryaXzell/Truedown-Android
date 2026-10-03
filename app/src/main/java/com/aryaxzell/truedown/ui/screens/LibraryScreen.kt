@@ -96,6 +96,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -937,6 +942,10 @@ private fun ExpressiveFilterChip(
         label = "filter_chip_content"
     )
 
+    val filterActive = stringResource(R.string.a11y_filter_active)
+    val filterInactive = stringResource(R.string.a11y_filter_inactive)
+    val filterClickLabel = stringResource(R.string.a11y_action_filter, label)
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = bg,
@@ -944,7 +953,15 @@ private fun ExpressiveFilterChip(
         shadowElevation = if (selected) 2.dp else 0.dp,
         modifier = Modifier
             .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() }
+            .clickable(
+                onClick = onClick,
+                onClickLabel = filterClickLabel
+            )
+            .semantics {
+                role = Role.Tab
+                this.selected = selected
+                stateDescription = if (selected) filterActive else filterInactive
+            }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -1030,11 +1047,25 @@ private fun ExpressiveLibraryPostItem(
         }
     }
 
+    val cardClickLabel = if (isSelectionMode) stringResource(R.string.a11y_card_select) else stringResource(R.string.a11y_card_open)
+    val cardStateDesc = if (isSelected) stringResource(R.string.a11y_card_selected) else stringResource(R.string.a11y_card_not_selected)
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .clickable { onClick() }
+            .clickable(
+                onClick = onClick,
+                onClickLabel = cardClickLabel
+            )
+            .semantics {
+                if (isSelectionMode) {
+                    role = Role.Checkbox
+                    stateDescription = cardStateDesc
+                } else {
+                    role = Role.Button
+                }
+            }
             .testTag("library_item_${postWithMedia.post.id}"),
         shape = RoundedCornerShape(24.dp),
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -1056,7 +1087,7 @@ private fun ExpressiveLibraryPostItem(
                 if (isSelectionMode) {
                     Checkbox(
                         checked = isSelected,
-                        onCheckedChange = { onSelectToggle?.invoke() },
+                        onCheckedChange = null,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 }
@@ -1175,7 +1206,7 @@ private fun ExpressiveLibraryPostItem(
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Menu",
+                                contentDescription = stringResource(R.string.a11y_btn_more_options),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

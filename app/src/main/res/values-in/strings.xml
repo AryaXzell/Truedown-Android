@@ -208,4 +208,27 @@
     <string name="onboarding_notif_active_desc">Anda akan menerima progres pengunduhan secara langsung.</string>
     <string name="onboarding_notif_disabled_note">Progres unduhan tidak akan tampil di panel notifikasi.</string>
     <string name="onboarding_btn_open_settings">Buka Pengaturan</string>
+    <string name="player_btn_pip">Picture in Picture</string>
+    <string name="player_btn_rotate">Rotasi layar</string>
+    <string name="player_btn_rewind_10s">Mundur 10 detik</string>
+    <string name="player_btn_play">Putar</string>
+    <string name="player_btn_pause">Jeda</string>
+    <string name="player_btn_forward_10s">Maju 10 detik</string>
+    <string name="a11y_select_photo">Pilih foto</string>
+    <string name="a11y_unselect_photo">Hapus pilihan</string>
+    <string name="a11y_action_filter">Aktifkan filter %1$s</string>
+    <string name="a11y_filter_active">Aktif</string>
+    <string name="a11y_filter_inactive">Tidak aktif</string>
+    <string name="a11y_card_select">Pilih item</string>
+    <string name="a11y_card_open">Buka item</string>
+    <string name="a11y_card_selected">Dipilih</string>
+    <string name="a11y_card_not_selected">Tidak dipilih</string>
+    <string name="a11y_state_playing">Sedang diputar</string>
+    <string name="a11y_state_paused">Dijeda</string>
+    <string name="a11y_action_play_video">Putar video</string>
+    <string name="a11y_action_pause_video">Jeda video</string>
+    <string name="a11y_action_play_audio">Putar audio</string>
+    <string name="a11y_action_pause_audio">Jeda audio</string>
+    <string name="a11y_btn_more_options">Opsi lainnya</string>
+    <string name="a11y_open_item">Buka unduhan</string>
 </resources>

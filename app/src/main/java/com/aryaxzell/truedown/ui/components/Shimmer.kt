@@ -40,6 +40,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+import com.aryaxzell.truedown.util.rememberReduceMotion
+
 val LocalShimmerTransition = staticCompositionLocalOf<InfiniteTransition?> { null }
 
 @Composable
@@ -53,14 +55,7 @@ fun ProvideSharedShimmer(content: @Composable () -> Unit) {
  * Uses shared InfiniteTransition when available and respects system reduce-motion settings.
  */
 fun Modifier.shimmerEffect(): Modifier = composed {
-    val context = LocalContext.current
-    val reduceMotion = remember {
-        try {
-            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-        } catch (_: Exception) {
-            false
-        }
-    }
+    val reduceMotion = rememberReduceMotion()
 
     if (reduceMotion) {
         return@composed background(MaterialTheme.colorScheme.surfaceContainerHigh)

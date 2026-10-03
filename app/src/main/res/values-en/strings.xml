@@ -208,4 +208,27 @@
     <string name="onboarding_notif_active_desc">You will receive real-time download progress.</string>
     <string name="onboarding_notif_disabled_note">Download progress will not appear in the notification panel.</string>
     <string name="onboarding_btn_open_settings">Open Settings</string>
+    <string name="player_btn_pip">Picture in Picture</string>
+    <string name="player_btn_rotate">Rotate screen</string>
+    <string name="player_btn_rewind_10s">Rewind 10 seconds</string>
+    <string name="player_btn_play">Play</string>
+    <string name="player_btn_pause">Pause</string>
+    <string name="player_btn_forward_10s">Forward 10 seconds</string>
+    <string name="a11y_select_photo">Select photo</string>
+    <string name="a11y_unselect_photo">Deselect photo</string>
+    <string name="a11y_action_filter">Enable %1$s filter</string>
+    <string name="a11y_filter_active">Active</string>
+    <string name="a11y_filter_inactive">Inactive</string>
+    <string name="a11y_card_select">Select item</string>
+    <string name="a11y_card_open">Open item</string>
+    <string name="a11y_card_selected">Selected</string>
+    <string name="a11y_card_not_selected">Not selected</string>
+    <string name="a11y_state_playing">Playing</string>
+    <string name="a11y_state_paused">Paused</string>
+    <string name="a11y_action_play_video">Play video</string>
+    <string name="a11y_action_pause_video">Pause video</string>
+    <string name="a11y_action_play_audio">Play audio</string>
+    <string name="a11y_action_pause_audio">Pause audio</string>
+    <string name="a11y_btn_more_options">More options</string>
+    <string name="a11y_open_item">Open download</string>
 </resources>

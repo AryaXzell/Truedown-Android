@@ -68,8 +68,16 @@ class DownloadScheduler(private val context: Context) {
                     val existing = db.mediaItemDao().findMediaItem(post.id, MediaKind.VIDEO.name, 0)
 
                     val mediaItemId = if (existing != null) {
-                        if (existing.status == MediaStatus.DONE.name && prefs.duplicateRule == "SKIP") {
-                            return@withContext Result.success(listOf(existing.id))
+                        if (existing.status == MediaStatus.DONE.name) {
+                            if (prefs.duplicateRule == "SKIP") {
+                                return@withContext Result.success(listOf(existing.id))
+                            } else {
+                                if (existing.mediaStoreUri.isNotBlank()) {
+                                    try {
+                                        MediaStoreDownloader(context).deleteFromMediaStore(existing.mediaStoreUri)
+                                    } catch (_: Exception) {}
+                                }
+                            }
                         }
                         existing.id
                     } else {
@@ -103,8 +111,16 @@ class DownloadScheduler(private val context: Context) {
                     val existing = db.mediaItemDao().findMediaItem(post.id, MediaKind.AUDIO.name, 0)
 
                     val mediaItemId = if (existing != null) {
-                        if (existing.status == MediaStatus.DONE.name && prefs.duplicateRule == "SKIP") {
-                            return@withContext Result.success(listOf(existing.id))
+                        if (existing.status == MediaStatus.DONE.name) {
+                            if (prefs.duplicateRule == "SKIP") {
+                                return@withContext Result.success(listOf(existing.id))
+                            } else {
+                                if (existing.mediaStoreUri.isNotBlank()) {
+                                    try {
+                                        MediaStoreDownloader(context).deleteFromMediaStore(existing.mediaStoreUri)
+                                    } catch (_: Exception) {}
+                                }
+                            }
                         }
                         existing.id
                     } else {
@@ -145,9 +161,17 @@ class DownloadScheduler(private val context: Context) {
                         val existing = db.mediaItemDao().findMediaItem(post.id, MediaKind.PHOTO.name, idx)
 
                         val mediaItemId = if (existing != null) {
-                            if (existing.status == MediaStatus.DONE.name && prefs.duplicateRule == "SKIP") {
-                                scheduledIds.add(existing.id)
-                                continue
+                            if (existing.status == MediaStatus.DONE.name) {
+                                if (prefs.duplicateRule == "SKIP") {
+                                    scheduledIds.add(existing.id)
+                                    continue
+                                } else {
+                                    if (existing.mediaStoreUri.isNotBlank()) {
+                                        try {
+                                            MediaStoreDownloader(context).deleteFromMediaStore(existing.mediaStoreUri)
+                                        } catch (_: Exception) {}
+                                    }
+                                }
                             }
                             existing.id
                         } else {

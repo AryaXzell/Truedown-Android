@@ -29,6 +29,12 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
@@ -1324,16 +1330,27 @@ private fun SettingsSwitchRow(
     val containerBg = iconContainerColor ?: MaterialTheme.colorScheme.secondaryContainer
     val tint = iconTint ?: MaterialTheme.colorScheme.secondary
 
+    val activeState = stringResource(R.string.summary_active)
+    val inactiveState = stringResource(R.string.summary_inactive)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .clickable {
-                if (enabled) {
-                    onCheckedChange(!checked)
-                } else {
-                    onDisabledClick?.invoke()
+            .clickable(
+                enabled = true,
+                onClick = {
+                    if (enabled) {
+                        onCheckedChange(!checked)
+                    } else {
+                        onDisabledClick?.invoke()
+                    }
                 }
+            )
+            .semantics {
+                role = Role.Switch
+                stateDescription = if (checked) activeState else inactiveState
+                toggleableState = ToggleableState(checked)
             }
             .padding(16.dp)
             .testTag(testTag),
@@ -1373,7 +1390,7 @@ private fun SettingsSwitchRow(
         Spacer(modifier = Modifier.width(8.dp))
         Switch(
             checked = checked,
-            onCheckedChange = if (enabled) onCheckedChange else null,
+            onCheckedChange = null,
             enabled = enabled
         )
     }

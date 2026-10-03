@@ -260,15 +260,8 @@ fun SlideshowGridScreen(
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(18.dp))
                         .semantics {
-                            role = Role.Checkbox
-                            toggleableState = ToggleableState(isSelected)
-                            contentDescription = a11yPhotoDesc
-                            customActions = listOf(
-                                CustomAccessibilityAction(label = a11yOpenLabel) {
-                                    onOpenPhotoViewer(index)
-                                    true
-                                }
-                            )
+                            role = Role.Button
+                            contentDescription = "$a11yPhotoDesc - $a11yOpenLabel"
                         }
                         .clickable { onOpenPhotoViewer(index) },
                     shape = RoundedCornerShape(18.dp),
@@ -292,13 +285,14 @@ fun SlideshowGridScreen(
                         )
 
                         // Selection Checkbox Overlay with >= 48dp minimum interactive touch target
+                        val selectLabel = if (isSelected) stringResource(R.string.a11y_unselect_photo) else stringResource(R.string.a11y_select_photo)
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .size(48.dp)
                                 .clickable(
                                     role = Role.Checkbox,
-                                    onClickLabel = if (isSelected) "Hapus pilihan" else "Pilih foto"
+                                    onClickLabel = selectLabel
                                 ) {
                                     selectedMap[index] = !isSelected
                                 },

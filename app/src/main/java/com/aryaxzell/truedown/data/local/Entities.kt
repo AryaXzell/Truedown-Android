@@ -63,3 +63,26 @@ data class PostWithMedia(
     )
     val mediaItems: List<MediaItemEntity>
 )
+
+fun PostWithMedia.toResolvedPost(): com.aryaxzell.truedown.domain.model.ResolvedPost {
+    val photoUrls = this.mediaItems
+        .filter { it.kind == "PHOTO" }
+        .sortedBy { it.itemIndex }
+        .map { it.mediaStoreUri.ifBlank { it.fileName } }
+    val videoItem = this.mediaItems.firstOrNull { it.kind == "VIDEO" }
+    val audioItem = this.mediaItems.firstOrNull { it.kind == "AUDIO" }
+    return com.aryaxzell.truedown.domain.model.ResolvedPost(
+        id = this.post.id,
+        type = com.aryaxzell.truedown.domain.model.PostType.valueOf(this.post.type),
+        title = this.post.title,
+        authorName = this.post.authorName,
+        authorHandle = this.post.authorHandle,
+        videoStandardUrl = videoItem?.mediaStoreUri,
+        videoHdUrl = videoItem?.mediaStoreUri,
+        photoUrls = photoUrls,
+        audioUrl = audioItem?.mediaStoreUri,
+        coverUrl = videoItem?.mediaStoreUri ?: photoUrls.firstOrNull(),
+        durationSec = 0,
+        sourceUrl = this.post.sourceUrl
+    )
+}

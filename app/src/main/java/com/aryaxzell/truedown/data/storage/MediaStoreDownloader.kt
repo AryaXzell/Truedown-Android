@@ -97,16 +97,19 @@ class MediaStoreDownloader(
 
             var bytesWritten = 0L
             try {
-                resolver.openOutputStream(uri)?.use { outputStream ->
+                val outputStream = resolver.openOutputStream(uri)
+                    ?: throw java.io.IOException("Gagal membuka output stream untuk MediaStore URI")
+
+                outputStream.use { os ->
                     body.byteStream().use { inputStream ->
                         val buffer = ByteArray(8192)
                         var read: Int
                         while (inputStream.read(buffer).also { read = it } != -1) {
-                            outputStream.write(buffer, 0, read)
+                            os.write(buffer, 0, read)
                             bytesWritten += read
                             onProgress(bytesWritten, contentLength)
                         }
-                        outputStream.flush()
+                        os.flush()
                     }
                 }
 

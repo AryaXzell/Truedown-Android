@@ -281,7 +281,7 @@ fun BuiltInVideoPlayerScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color.Black.copy(alpha = 0.5f),
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         IconButton(onClick = onClose) {
                             Icon(
@@ -304,7 +304,7 @@ fun BuiltInVideoPlayerScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color.Black.copy(alpha = 0.5f),
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         IconButton(
                             onClick = {
@@ -323,7 +323,7 @@ fun BuiltInVideoPlayerScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PictureInPicture,
-                                contentDescription = "Picture in Picture",
+                                contentDescription = stringResource(R.string.player_btn_pip),
                                 tint = Color.White
                             )
                         }
@@ -334,7 +334,7 @@ fun BuiltInVideoPlayerScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color.Black.copy(alpha = 0.5f),
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         IconButton(
                             onClick = {
@@ -348,7 +348,7 @@ fun BuiltInVideoPlayerScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ScreenRotation,
-                                contentDescription = "Rotasi",
+                                contentDescription = stringResource(R.string.player_btn_rotate),
                                 tint = Color.White
                             )
                         }
@@ -363,11 +363,19 @@ fun BuiltInVideoPlayerScreen(
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center)
         ) {
+            val playActionLabel = if (isPlaying) stringResource(R.string.a11y_action_pause_video) else stringResource(R.string.a11y_action_play_video)
+            val playStateDesc = if (isPlaying) stringResource(R.string.a11y_state_playing) else stringResource(R.string.a11y_state_paused)
             Surface(
                 modifier = Modifier
                     .size(72.dp)
-                    .clickable {
+                    .clickable(
+                        role = androidx.compose.ui.semantics.Role.Button,
+                        onClickLabel = playActionLabel
+                    ) {
                         if (isPlaying) exoPlayer.pause() else exoPlayer.play()
+                    }
+                    .semantics {
+                        stateDescription = playStateDesc
                     },
                 shape = CircleShape,
                 color = Color.Black.copy(alpha = 0.6f),
@@ -376,7 +384,7 @@ fun BuiltInVideoPlayerScreen(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        contentDescription = if (isPlaying) stringResource(R.string.player_btn_pause) else stringResource(R.string.player_btn_play),
                         tint = Color.White,
                         modifier = Modifier.size(40.dp)
                     )

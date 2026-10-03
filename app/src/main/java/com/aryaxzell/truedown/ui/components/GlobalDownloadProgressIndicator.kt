@@ -73,7 +73,8 @@ fun GlobalDownloadProgressBar(
                     .clip(RoundedCornerShape(22.dp))
                     .semantics {
                         liveRegion = LiveRegionMode.Polite
-                        stateDescription = "${globalStatus.progressPercent}%"
+                        val coarseMilestone = (globalStatus.progressPercent / 25) * 25
+                        stateDescription = "$coarseMilestone%"
                     }
                     .then(
                         if (onClick != null) {

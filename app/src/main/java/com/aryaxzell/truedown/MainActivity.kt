@@ -54,6 +54,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import com.aryaxzell.truedown.ui.components.GlobalDownloadProgressBar
+import com.aryaxzell.truedown.util.rememberReduceMotion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.aryaxzell.truedown.data.local.toResolvedPost
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.ui.AppScreen
@@ -143,12 +145,35 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+
+        handleNotificationIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingShareIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        if (intent == null) return
+        when (intent.action) {
+            NotificationHelper.ACTION_RETRY_DOWNLOAD -> {
+                val sourceUrl = intent.getStringExtra(NotificationHelper.EXTRA_SOURCE_URL)
+                if (!sourceUrl.isNullOrBlank()) {
+                    Toast.makeText(this, getString(R.string.home_checking_link), Toast.LENGTH_SHORT).show()
+                    viewModel.resolveUrl(sourceUrl, isShareIntent = true)
+                }
+            }
+            NotificationHelper.ACTION_DOWNLOAD_MP3 -> {
+                val postId = intent.getStringExtra(NotificationHelper.EXTRA_POST_ID)
+                if (!postId.isNullOrBlank()) {
+                    Toast.makeText(this, getString(R.string.preview_starting_download), Toast.LENGTH_SHORT).show()
+                    viewModel.downloadMp3ForPostId(postId)
+                }
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -188,6 +213,7 @@ fun MainAppContent(
         return
     }
 
+    val reduceMotion = rememberReduceMotion()
     val currentScreen by viewModel.currentScreen.collectAsState()
     val globalDownloadStatus by viewModel.globalDownloadStatus.collectAsState()
     val showBottomBar = (currentScreen is AppScreen.Home || currentScreen is AppScreen.Library) && !isInPipMode
@@ -197,47 +223,51 @@ fun MainAppContent(
         AnimatedContent(
             targetState = currentScreen,
             transitionSpec = {
-                val enterSpec = spring<Float>(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-                val exitSpec = spring<Float>(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-
-                if (initialState is AppScreen.Home && targetState is AppScreen.Library) {
-                    // Premium sliding transition to the left (forward)
-                    (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
-                            fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)))
-                        .togetherWith(
-                            slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } +
-                                    fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
-                        )
-                } else if (initialState is AppScreen.Library && targetState is AppScreen.Home) {
-                    // Premium sliding transition to the right (backward)
-                    (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } +
-                            fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)))
-                        .togetherWith(
-                            slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
-                                    fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
-                        )
-                } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings || targetState is AppScreen.About) {
-                    // Container Transform Scale & Fade expansion into detail / preview / players
-                    (scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)) +
-                            fadeIn(animationSpec = enterSpec))
-                        .togetherWith(
-                            scaleOut(targetScale = 1.04f, animationSpec = exitSpec) +
-                                    fadeOut(animationSpec = exitSpec)
-                        )
+                if (reduceMotion) {
+                    fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
                 } else {
-                    // Container Transform Collapse back to parent
-                    (scaleIn(initialScale = 1.04f, animationSpec = enterSpec) +
-                            fadeIn(animationSpec = enterSpec))
-                        .togetherWith(
-                            scaleOut(targetScale = 0.90f, animationSpec = exitSpec) +
-                                    fadeOut(animationSpec = exitSpec)
-                        )
+                    val enterSpec = spring<Float>(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                    val exitSpec = spring<Float>(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+
+                    if (initialState is AppScreen.Home && targetState is AppScreen.Library) {
+                        // Premium sliding transition to the left (forward)
+                        (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
+                                fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)))
+                            .togetherWith(
+                                slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } +
+                                        fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
+                            )
+                    } else if (initialState is AppScreen.Library && targetState is AppScreen.Home) {
+                        // Premium sliding transition to the right (backward)
+                        (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } +
+                                fadeIn(animationSpec = tween(180, easing = FastOutSlowInEasing)))
+                            .togetherWith(
+                                slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
+                                        fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
+                            )
+                    } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings || targetState is AppScreen.About) {
+                        // Container Transform Scale & Fade expansion into detail / preview / players
+                        (scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)) +
+                                fadeIn(animationSpec = enterSpec))
+                            .togetherWith(
+                                scaleOut(targetScale = 1.04f, animationSpec = exitSpec) +
+                                        fadeOut(animationSpec = exitSpec)
+                            )
+                    } else {
+                        // Container Transform Collapse back to parent
+                        (scaleIn(initialScale = 1.04f, animationSpec = enterSpec) +
+                                fadeIn(animationSpec = enterSpec))
+                            .togetherWith(
+                                scaleOut(targetScale = 0.90f, animationSpec = exitSpec) +
+                                        fadeOut(animationSpec = exitSpec)
+                            )
+                    }
                 }
             },
             modifier = Modifier.fillMaxSize(),
@@ -261,7 +291,7 @@ fun MainAppContent(
                             when (val target = com.aryaxzell.truedown.domain.model.resolveOpenTarget(postWithMedia)) {
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.Video -> viewModel.navigateTo(AppScreen.VideoPlayer(target.postWithMedia))
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.Audio -> viewModel.navigateTo(AppScreen.AudioPlayer(target.postWithMedia))
-                                is com.aryaxzell.truedown.domain.model.OpenTarget.Slideshow -> viewModel.navigateTo(AppScreen.Library)
+                                is com.aryaxzell.truedown.domain.model.OpenTarget.Slideshow -> viewModel.navigateTo(AppScreen.PhotoViewer(target.postWithMedia.toResolvedPost()))
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.NotFound -> {
                                     android.widget.Toast.makeText(
                                         context,
@@ -285,8 +315,8 @@ fun MainAppContent(
                         onOpenAudioPlayer = { postWithMedia ->
                             viewModel.navigateTo(AppScreen.AudioPlayer(postWithMedia))
                         },
-                        onOpenSlideshow = { _ ->
-                            // Detail in library
+                        onOpenSlideshow = { postWithMedia ->
+                            viewModel.navigateTo(AppScreen.PhotoViewer(postWithMedia.toResolvedPost()))
                         },
                         onNavigateToDownloader = {
                             viewModel.navigateTo(AppScreen.Home)

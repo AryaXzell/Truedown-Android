@@ -43,6 +43,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.aryaxzell.truedown.util.rememberReduceMotion
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -173,13 +174,7 @@ fun BuiltInAudioPlayerScreen(
         }
     }
 
-    val reduceMotion = remember {
-        try {
-            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-        } catch (_: Exception) {
-            false
-        }
-    }
+    val reduceMotion = rememberReduceMotion()
 
     val rotationAngle by if (isPlaying && !reduceMotion) {
         val infiniteTransition = rememberInfiniteTransition(label = "vinyl_rotate")
@@ -404,7 +399,7 @@ fun BuiltInAudioPlayerScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Replay10,
-                            contentDescription = "Mundur 10 detik",
+                            contentDescription = stringResource(R.string.player_btn_rewind_10s),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(26.dp)
                         )
@@ -438,7 +433,7 @@ fun BuiltInAudioPlayerScreen(
                             imageVector = if (isEnded) Icons.Default.Replay
                             else if (isPlaying) Icons.Default.Pause
                             else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            contentDescription = if (isPlaying) stringResource(R.string.player_btn_pause) else stringResource(R.string.player_btn_play),
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(38.dp)
                         )
@@ -460,7 +455,7 @@ fun BuiltInAudioPlayerScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Forward10,
-                            contentDescription = "Maju 10 detik",
+                            contentDescription = stringResource(R.string.player_btn_forward_10s),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(26.dp)
                         )

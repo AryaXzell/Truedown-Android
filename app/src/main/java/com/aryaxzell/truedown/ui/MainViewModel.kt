@@ -279,7 +279,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _resolveState.value = ResolveState.Idle
     }
 
-    fun resolveUrl(url: String, onNavigate: ((AppScreen) -> Unit)? = null) {
+    fun resolveUrl(url: String, isShareIntent: Boolean = false, onNavigate: ((AppScreen) -> Unit)? = null) {
         markClipboardUrlHandled(url)
         val cleanUrl = extractUrl(url)
         if (cleanUrl.isBlank() || !isTikTokUrl(cleanUrl)) {
@@ -298,6 +298,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     navigateTo(nextScreen)
                     onNavigate?.invoke(nextScreen)
                 } else {
+                    if (isShareIntent) {
+                        startDownload(resolvedPost)
+                    }
                     val nextScreen = AppScreen.Preview(resolvedPost)
                     navigateTo(nextScreen)
                     onNavigate?.invoke(nextScreen)
@@ -371,6 +374,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startDownload(post: ResolvedPost, downloadMp3Only: Boolean = false, selectedPhotoIndices: List<Int>? = null) {
         viewModelScope.launch { enqueueDownload(post, downloadMp3Only, selectedPhotoIndices) }
+    }
+
+    fun downloadMp3ForPostId(postId: String) {
+        viewModelScope.launch {
+            val postWithMedia = database.postDao().getPostWithMediaById(postId)
+            if (postWithMedia != null) {
+                val sourceUrl = postWithMedia.post.sourceUrl
+                if (sourceUrl.isNotBlank()) {
+                    val result = downloadProvider.resolve(sourceUrl)
+                    result.onSuccess { resolvedPost ->
+                        startDownload(resolvedPost, downloadMp3Only = true)
+                    }
+                }
+            }
+        }
     }
 
     fun cancelDownload(postId: String) {

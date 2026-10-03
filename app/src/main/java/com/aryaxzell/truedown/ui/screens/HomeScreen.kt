@@ -695,11 +695,16 @@ private fun ExpressiveRecentPostItem(
     val isDownloading = downloadProgress?.status == MediaStatus.DOWNLOADING ||
             downloadProgress?.status == MediaStatus.PENDING
 
+    val openItemLabel = stringResource(R.string.a11y_open_item)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .clickable { onClick() }
+            .clickable(
+                role = androidx.compose.ui.semantics.Role.Button,
+                onClickLabel = openItemLabel,
+                onClick = onClick
+            )
             .testTag("recent_item_${postWithMedia.post.id}"),
         shape = RoundedCornerShape(22.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,

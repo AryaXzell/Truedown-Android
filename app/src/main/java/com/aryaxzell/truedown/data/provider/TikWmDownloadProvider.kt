@@ -184,7 +184,13 @@ class TikWmDownloadProvider(
                 val finalHdSize = rawHdSize ?: fetchContentLength(hdVideoUrl)
                 val finalAudioSize = rawAudioSize ?: fetchContentLength(audioUrl)
 
-                val type = if (photoUrls.size > 1) PostType.SLIDESHOW else PostType.VIDEO
+                val type = if (photoUrls.isNotEmpty() && standardVideoUrl == null) {
+                    PostType.SLIDESHOW
+                } else if (photoUrls.size > 1) {
+                    PostType.SLIDESHOW
+                } else {
+                    PostType.VIDEO
+                }
 
                 val resolved = ResolvedPost(
                     id = id,
