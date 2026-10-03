@@ -65,7 +65,7 @@ object ChangelogRepository {
                             tagName = tagName,
                             name = name,
                             publishedAt = formattedDate,
-                            body = cleanMarkdown(body),
+                            body = com.aryaxzell.truedown.util.ReleaseNotesFormatter.format(body),
                             htmlUrl = htmlUrl,
                             isLatest = (i == 0)
                         )

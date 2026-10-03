@@ -329,6 +329,7 @@ fun HomeScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Button(
                                         onClick = {
+                                            com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                                             val url = detectedClipboardUrl ?: ""
                                             urlInput = url
                                             viewModel.clearDetectedClipboardUrl()
@@ -407,6 +408,7 @@ fun HomeScreen(
                                         role = androidx.compose.ui.semantics.Role.Button,
                                         onClickLabel = stringResource(R.string.a11y_btn_paste)
                                     ) {
+                                        com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                         val clip = clipboard?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
                                         if (clip.isNotBlank()) {
@@ -460,7 +462,10 @@ fun HomeScreen(
                             ),
                             trailingIcon = {
                                 if (urlInput.isNotEmpty()) {
-                                    IconButton(onClick = { urlInput = "" }) {
+                                    IconButton(onClick = {
+                                        com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
+                                        urlInput = ""
+                                    }) {
                                         Icon(
                                             imageVector = Icons.Default.Clear,
                                             contentDescription = stringResource(R.string.action_clear),
@@ -475,6 +480,7 @@ fun HomeScreen(
 
                         Button(
                             onClick = {
+                                com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                                 viewModel.resolveUrl(urlInput)
                             },
                             enabled = urlInput.isNotBlank() && resolveState !is ResolveState.Loading,

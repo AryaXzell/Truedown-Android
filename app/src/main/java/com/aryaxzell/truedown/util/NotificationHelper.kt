@@ -21,6 +21,8 @@ object NotificationHelper {
     const val ACTION_RETRY_DOWNLOAD = "com.aryaxzell.truedown.ACTION_RETRY"
     const val ACTION_DOWNLOAD_MP3 = "com.aryaxzell.truedown.ACTION_DOWNLOAD_MP3"
     const val ACTION_OPEN_POST = "com.aryaxzell.truedown.ACTION_OPEN_POST"
+    const val ACTION_CANCEL_APP_UPDATE = "com.aryaxzell.truedown.ACTION_CANCEL_APP_UPDATE"
+    const val NOTIFICATION_ID_APP_UPDATE = 9999
 
     const val EXTRA_POST_ID = "extra_post_id"
     const val EXTRA_MEDIA_KIND = "extra_media_kind"
@@ -184,5 +186,138 @@ object NotificationHelper {
         try {
             NotificationManagerCompat.from(context).notify(notificationId, builder.build())
         } catch (_: SecurityException) {}
+    }
+
+    fun showUpdateProgressNotification(
+        context: Context,
+        title: String,
+        progress: Float,
+        downloadedBytes: Long,
+        totalBytes: Long,
+        speedBytesPerSec: Long = 0L
+    ) {
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_APP_UPDATE * 10 + 1,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val cancelIntent = Intent(context, AppUpdateCancelReceiver::class.java).apply {
+            action = ACTION_CANCEL_APP_UPDATE
+        }
+        val cancelPendingIntent = PendingIntent.getBroadcast(
+            context,
+            NOTIFICATION_ID_APP_UPDATE * 10 + 2,
+            cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val percent = (progress * 100).toInt().coerceIn(0, 100)
+        val downloadedText = android.text.format.Formatter.formatFileSize(context, downloadedBytes)
+        val totalText = if (totalBytes > 0) android.text.format.Formatter.formatFileSize(context, totalBytes) else "..."
+        val speedText = if (speedBytesPerSec > 0) "${android.text.format.Formatter.formatFileSize(context, speedBytesPerSec)}/s" else ""
+
+        val subtitle = if (speedText.isNotBlank()) {
+            "$percent% • $downloadedText / $totalText • $speedText"
+        } else {
+            "$percent% • $downloadedText / $totalText"
+        }
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_PROGRESS)
+            .setContentTitle(title)
+            .setContentText(subtitle)
+            .setSmallIcon(R.drawable.ic_truedown_logo)
+            .setProgress(100, percent, totalBytes <= 0L && progress <= 0f)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(openPendingIntent)
+            .addAction(0, context.getString(R.string.action_cancel), cancelPendingIntent)
+
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_APP_UPDATE, builder.build())
+        } catch (_: SecurityException) {}
+    }
+
+    fun showUpdateReadyNotification(
+        context: Context,
+        apkFile: java.io.File,
+        versionTag: String
+    ) {
+        val apkUri: Uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            apkFile
+        )
+
+        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(apkUri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        val installPendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_APP_UPDATE * 10 + 3,
+            installIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_RESULT)
+            .setContentTitle(context.getString(R.string.notif_update_ready))
+            .setContentText(context.getString(R.string.notif_update_ready_desc, versionTag))
+            .setSmallIcon(R.drawable.ic_truedown_logo)
+            .setAutoCancel(true)
+            .setContentIntent(installPendingIntent)
+            .addAction(0, context.getString(R.string.notif_update_install_action), installPendingIntent)
+
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_APP_UPDATE, builder.build())
+        } catch (_: SecurityException) {}
+    }
+
+    fun showUpdateErrorNotification(
+        context: Context,
+        errorMessage: String
+    ) {
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPendingIntent = PendingIntent.getActivity(
+            context,
+            NOTIFICATION_ID_APP_UPDATE * 10 + 4,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_RESULT)
+            .setContentTitle(context.getString(R.string.notif_update_failed))
+            .setContentText(errorMessage)
+            .setSmallIcon(R.drawable.ic_truedown_logo)
+            .setAutoCancel(true)
+            .setContentIntent(openPendingIntent)
+
+        try {
+            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_APP_UPDATE, builder.build())
+        } catch (_: SecurityException) {}
+    }
+
+    fun cancelUpdateNotification(context: Context) {
+        try {
+            NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID_APP_UPDATE)
+        } catch (_: SecurityException) {}
+    }
+}
+
+class AppUpdateCancelReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == NotificationHelper.ACTION_CANCEL_APP_UPDATE) {
+            AppLogger.i("AppUpdateCancel", "Menerima aksi pembatalan unduhan update dari notifikasi")
+            NightlyUpdateManager.cancelDownload(context)
+            ReleaseUpdateManager.cancelDownload(context)
+            NotificationHelper.cancelUpdateNotification(context)
+        }
     }
 }

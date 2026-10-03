@@ -146,6 +146,9 @@
     <string name="settings_lang_system">Ikuti sistem</string>
     <string name="settings_lang_id">Bahasa Indonesia</string>
     <string name="settings_lang_en">English</string>
+    <string name="settings_haptic_title">Umpan Balik Haptik</string>
+    <string name="settings_haptic_desc_on">Aktif — Getaran taktil saat menekan tombol &amp; unduhan selesai</string>
+    <string name="settings_haptic_desc_off">Nonaktifkan getaran haptik</string>
 
     <string name="settings_group_download">Unduhan</string>
     <string name="settings_default_quality_label">Kualitas video default</string>
@@ -231,4 +234,9 @@
     <string name="a11y_action_pause_audio">Jeda audio</string>
     <string name="a11y_btn_more_options">Opsi lainnya</string>
     <string name="a11y_open_item">Buka unduhan</string>
+    <string name="notif_update_downloading">Mengunduh Pembaruan Aplikasi</string>
+    <string name="notif_update_ready">Pembaruan Siap Dipasang</string>
+    <string name="notif_update_ready_desc">Ketuk untuk memasang versi %1$s</string>
+    <string name="notif_update_install_action">Pasang Sekarang</string>
+    <string name="notif_update_failed">Pembaruan Gagal</string>
 </resources>

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,12 +35,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -138,7 +141,7 @@ enum class LibraryFilter {
     ALL, VIDEO, PHOTO, AUDIO
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun LibraryScreen(
     viewModel: MainViewModel,
@@ -158,6 +161,7 @@ fun LibraryScreen(
     var currentFilter by remember { mutableStateOf(LibraryFilter.ALL) }
 
     var postToDelete by remember { mutableStateOf<PostWithMedia?>(null) }
+    var deletedMediaPost by remember { mutableStateOf<PostWithMedia?>(null) }
     var deleteFromGallerySingle by remember { mutableStateOf(false) }
     var deleteFromGalleryBulk by remember { mutableStateOf(false) }
 
@@ -451,28 +455,22 @@ fun LibraryScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                // Illustrative visual asset
-                                Surface(
+                                // Modern minimalist vector illustration matching Truedown app icon motif
+                                Box(
                                     modifier = Modifier
-                                        .size(150.dp)
-                                        .clip(RoundedCornerShape(32.dp)),
-                                    shape = RoundedCornerShape(32.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    shadowElevation = 6.dp,
-                                    tonalElevation = 2.dp,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                                        .size(136.dp)
+                                        .testTag("library_empty_illustration"),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Image(
-                                        painter = painterResource(id = R.drawable.img_empty_library),
+                                        painter = painterResource(id = R.drawable.ic_empty_library_vector),
                                         contentDescription = stringResource(R.string.library_empty_title),
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .testTag("library_empty_illustration"),
-                                        contentScale = ContentScale.Crop
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Fit
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(24.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
 
                                 val emptyTitle = when {
                                     searchQuery.isNotBlank() -> stringResource(R.string.library_no_search_results)
@@ -530,8 +528,8 @@ fun LibraryScreen(
                                         onClick = onNavigateToDownloader,
                                         shape = RoundedCornerShape(20.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                             containerColor = MaterialTheme.colorScheme.primary,
+                                             contentColor = MaterialTheme.colorScheme.onPrimary
                                         ),
                                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                                         modifier = Modifier
@@ -552,48 +550,87 @@ fun LibraryScreen(
                                         )
                                     }
 
-                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Spacer(modifier = Modifier.height(18.dp))
 
-                                    // Feature highlights row
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    // Feature highlights with FlowRow & custom vector icons (No emojis, no squishing bug)
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                                         ) {
-                                            Text(
-                                                text = "✨ Tanpa Watermark",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Tanpa Watermark",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
                                         }
+
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                                         ) {
-                                            Text(
-                                                text = "⚡ Kualitas HD",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.HighQuality,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Kualitas HD",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
                                         }
+
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.85f),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                                         ) {
-                                            Text(
-                                                text = "🎵 Audio MP3",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Audiotrack,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Audio MP3",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -686,10 +723,13 @@ fun LibraryScreen(
                                                 selectedPostIds.add(postWithMedia.post.id)
                                             }
                                         } else {
-                                            when (val target = resolveOpenTarget(postWithMedia)) {
+                                            when (val target = resolveOpenTarget(postWithMedia, context)) {
                                                 is OpenTarget.Video -> onOpenVideoPlayer(target.postWithMedia)
                                                 is OpenTarget.Audio -> onOpenAudioPlayer(target.postWithMedia)
                                                 is OpenTarget.Slideshow -> onOpenSlideshow(target.postWithMedia)
+                                                is OpenTarget.MediaDeleted -> {
+                                                    deletedMediaPost = target.postWithMedia
+                                                }
                                                 is OpenTarget.NotFound -> {
                                                     scope.launch {
                                                         snackbarHostState.showSnackbar(context.getString(R.string.player_media_not_found))
@@ -704,16 +744,18 @@ fun LibraryScreen(
                                     },
                                     onShareClick = {
                                         val firstItem = postWithMedia.mediaItems.firstOrNull { it.status == "DONE" || it.status == MediaStatus.DONE.name }
-                                        firstItem?.let { item ->
-                                            if (item.mediaStoreUri.isNotBlank()) {
+                                        if (firstItem != null) {
+                                            if (firstItem.mediaStoreUri.isNotBlank() && com.aryaxzell.truedown.util.StorageUtil.isMediaAccessible(context, firstItem.mediaStoreUri)) {
                                                 val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                                                    type = if (item.kind == "VIDEO" || item.kind == MediaKind.VIDEO.name) "video/*"
-                                                    else if (item.kind == "PHOTO" || item.kind == MediaKind.PHOTO.name) "image/*"
+                                                    type = if (firstItem.kind == "VIDEO" || firstItem.kind == MediaKind.VIDEO.name) "video/*"
+                                                    else if (firstItem.kind == "PHOTO" || firstItem.kind == MediaKind.PHOTO.name) "image/*"
                                                     else "audio/*"
-                                                    putExtra(Intent.EXTRA_STREAM, Uri.parse(item.mediaStoreUri))
+                                                    putExtra(Intent.EXTRA_STREAM, Uri.parse(firstItem.mediaStoreUri))
                                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                 }
                                                 context.startActivity(Intent.createChooser(sendIntent, "Bagikan"))
+                                            } else {
+                                                deletedMediaPost = postWithMedia
                                             }
                                         }
                                     },
@@ -920,6 +962,82 @@ fun LibraryScreen(
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
+    }
+
+    // Modal Peringatan Berkas Media Dihapus Manual dari Galeri
+    deletedMediaPost?.let { postItem ->
+        AlertDialog(
+            onDismissRequest = { deletedMediaPost = null },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Media Telah Dihapus dari Galeri",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Berkas media untuk konten ini tidak lagi ditemukan di penyimpanan atau telah dihapus secara manual dari Galeri perangkat Anda.\n\nApakah Anda ingin menghapus catatan item ini dari Library atau mengunduh ulang?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val p = postItem
+                        deletedMediaPost = null
+                        viewModel.deletePost(p, deleteFromGallery = false)
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Item berhasil dihapus dari Library")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Hapus dari Library", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (postItem.post.sourceUrl.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                val p = postItem
+                                deletedMediaPost = null
+                                viewModel.retryFailedDownload(p)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Memulai proses unduh ulang...")
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Unduh Ulang", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    TextButton(
+                        onClick = { deletedMediaPost = null },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Tutup", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         )

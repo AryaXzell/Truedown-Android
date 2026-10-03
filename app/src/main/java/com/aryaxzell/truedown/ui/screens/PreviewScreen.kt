@@ -468,6 +468,7 @@ fun PreviewScreen(
             // Primary Download Button
             Button(
                 onClick = {
+                    com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                     viewModel.startDownload(post, downloadMp3Only = false)
                     scope.launch {
                         snackbarHostState.showSnackbar(context.getString(R.string.preview_starting_download))
@@ -521,6 +522,7 @@ fun PreviewScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 FilledTonalButton(
                     onClick = {
+                        com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                         viewModel.startDownload(post, downloadMp3Only = true)
                         scope.launch {
                             snackbarHostState.showSnackbar(context.getString(R.string.preview_starting_download))

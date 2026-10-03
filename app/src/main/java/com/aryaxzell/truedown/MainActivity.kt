@@ -54,15 +54,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import com.aryaxzell.truedown.ui.components.GlobalDownloadProgressBar
+import com.aryaxzell.truedown.ui.components.LanguageSwitchSkeletonOverlay
 import com.aryaxzell.truedown.util.rememberReduceMotion
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -122,27 +127,57 @@ class MainActivity : ComponentActivity() {
         // Schedule periodic cache and temporary files cleanup
         CleanupWorker.schedule(this)
 
+        // Ensure update history and current installed version are recorded
+        lifecycleScope.launch {
+            com.aryaxzell.truedown.util.UpdateHistoryLogger.ensureVersionHistoryInitialized(this@MainActivity)
+        }
+
         val isShareIntent = if (savedInstanceState == null) handleIncomingShareIntent(intent) else false
         viewModel.initializeStartingScreen(isShareIntent)
 
         setContent {
             val preferences by viewModel.preferences.collectAsState()
+            val isLanguageSwitching by viewModel.isLanguageSwitching.collectAsState()
             val pipMode by isInPipMode.collectAsState()
 
-            // Dynamically apply locale when preference changes
+            // Dynamically provide localized context and configuration to Compose in realtime
+            val localizedContext = remember(preferences.language) {
+                LocaleHelper.setLocale(this@MainActivity, preferences.language)
+            }
+            val localizedConfig = remember(preferences.language, localizedContext) {
+                LocaleHelper.getLocalizedConfiguration(this@MainActivity, preferences.language)
+            }
+
+            // Dynamically apply locale to activity when preference changes
             LaunchedEffect(preferences.language) {
                 LocaleHelper.applyLanguage(this@MainActivity, preferences.language)
             }
 
-            TruedownTheme(
-                themeMode = preferences.themeMode,
-                dynamicColor = preferences.dynamicColor
+            CompositionLocalProvider(
+                LocalContext provides localizedContext,
+                LocalConfiguration provides localizedConfig
             ) {
-                MainAppContent(
-                    viewModel = viewModel,
-                    isInPipMode = pipMode,
-                    onFinishActivity = { finish() }
-                )
+                TruedownTheme(
+                    themeMode = preferences.themeMode,
+                    dynamicColor = preferences.dynamicColor
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        MainAppContent(
+                            viewModel = viewModel,
+                            isInPipMode = pipMode,
+                            onFinishActivity = { finish() }
+                        )
+
+                        // Seamless skeleton loading animation when switching languages
+                        AnimatedVisibility(
+                            visible = isLanguageSwitching,
+                            enter = fadeIn(animationSpec = tween(120)),
+                            exit = fadeOut(animationSpec = tween(180))
+                        ) {
+                            LanguageSwitchSkeletonOverlay()
+                        }
+                    }
+                }
             }
         }
 
@@ -214,6 +249,8 @@ fun MainAppContent(
     }
 
     val reduceMotion = rememberReduceMotion()
+    val context = LocalContext.current
+    val preferences by viewModel.preferences.collectAsState()
     val currentScreen by viewModel.currentScreen.collectAsState()
     val globalDownloadStatus by viewModel.globalDownloadStatus.collectAsState()
     val showBottomBar = (currentScreen is AppScreen.Home || currentScreen is AppScreen.Library) && !isInPipMode
@@ -288,10 +325,17 @@ fun MainAppContent(
                         viewModel = viewModel,
                         onNavigateToLibrary = { viewModel.navigateTo(AppScreen.Library) },
                         onNavigateToItemDetail = { postWithMedia ->
-                            when (val target = com.aryaxzell.truedown.domain.model.resolveOpenTarget(postWithMedia)) {
+                            when (val target = com.aryaxzell.truedown.domain.model.resolveOpenTarget(postWithMedia, context)) {
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.Video -> viewModel.navigateTo(AppScreen.VideoPlayer(target.postWithMedia))
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.Audio -> viewModel.navigateTo(AppScreen.AudioPlayer(target.postWithMedia))
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.Slideshow -> viewModel.navigateTo(AppScreen.PhotoViewer(target.postWithMedia.toResolvedPost()))
+                                is com.aryaxzell.truedown.domain.model.OpenTarget.MediaDeleted -> {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Berkas media telah dihapus dari galeri.",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                }
                                 is com.aryaxzell.truedown.domain.model.OpenTarget.NotFound -> {
                                     android.widget.Toast.makeText(
                                         context,
@@ -434,7 +478,10 @@ fun MainAppContent(
                             selectedIcon = Icons.Filled.Home,
                             unselectedIcon = Icons.Outlined.Home,
                             label = stringResource(R.string.nav_home),
-                            onClick = { viewModel.navigateTo(AppScreen.Home) },
+                            onClick = {
+                                com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
+                                viewModel.navigateTo(AppScreen.Home)
+                            },
                             testTag = "nav_item_home"
                         )
 
@@ -444,7 +491,10 @@ fun MainAppContent(
                             selectedIcon = Icons.Filled.PhotoLibrary,
                             unselectedIcon = Icons.Outlined.PhotoLibrary,
                             label = stringResource(R.string.nav_library),
-                            onClick = { viewModel.navigateTo(AppScreen.Library) },
+                            onClick = {
+                                com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
+                                viewModel.navigateTo(AppScreen.Library)
+                            },
                             testTag = "nav_item_library"
                         )
                     }
@@ -460,7 +510,10 @@ fun MainAppContent(
                     modifier = Modifier
                         .size(54.dp)
                         .clip(CircleShape)
-                        .clickable { viewModel.navigateTo(AppScreen.Settings) }
+                        .clickable {
+                            com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
+                            viewModel.navigateTo(AppScreen.Settings)
+                        }
                         .testTag("floating_settings_button")
                 ) {
                     Box(

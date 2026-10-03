@@ -74,6 +74,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val startupReady: StateFlow<Boolean> = _startupReady.asStateFlow()
     private var startupInitialized = false
 
+    private val _isLanguageSwitching = MutableStateFlow(false)
+    val isLanguageSwitching: StateFlow<Boolean> = _isLanguageSwitching.asStateFlow()
+
     private val _screenStack = MutableStateFlow<List<AppScreen>>(listOf(AppScreen.Home))
     val currentScreen: StateFlow<AppScreen> = MutableStateFlow<AppScreen>(AppScreen.Home).apply {
         viewModelScope.launch {
@@ -485,8 +488,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateLanguage(langCode: String) {
+        if (preferences.value.language == langCode) return
         viewModelScope.launch {
+            _isLanguageSwitching.value = true
             userPreferencesRepository.setLanguage(langCode)
+            kotlinx.coroutines.delay(350L)
+            _isLanguageSwitching.value = false
         }
     }
 
@@ -499,6 +506,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateDynamicColor(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setDynamicColor(enabled)
+        }
+    }
+
+    fun updateHapticFeedback(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setHapticFeedback(enabled)
         }
     }
 

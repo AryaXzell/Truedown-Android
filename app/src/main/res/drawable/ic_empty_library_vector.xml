@@ -1,0 +1,97 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="160dp"
+    android:height="160dp"
+    android:viewportWidth="160"
+    android:viewportHeight="160">
+
+    <!-- Outer Ambient Glow Ring -->
+    <path
+        android:pathData="M 80,12 C 117.55,12 148,42.45 148,80 C 148,117.55 117.55,148 80,148 C 42.45,148 12,117.55 12,80 C 12,42.45 42.45,12 80,12 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#253B82F6"
+        android:strokeAlpha="0.4" />
+
+    <!-- Secondary Dashed Orbit -->
+    <path
+        android:pathData="M 80,24 C 110.93,24 136,49.07 136,80 C 136,110.93 110.93,136 80,136 C 49.07,136 24,110.93 24,80 C 24,49.07 49.07,24 80,24 Z"
+        android:strokeWidth="1"
+        android:strokeColor="#4060A5FA"
+        android:strokeAlpha="0.3" />
+
+    <!-- Ambient Shadow Under Main Plate -->
+    <path
+        android:pathData="M 44,48 C 44,38 52,30 62,30 L 98,30 C 108,30 116,38 116,48 L 116,112 C 116,122 108,130 98,130 L 62,130 C 52,130 44,122 44,112 Z"
+        android:fillColor="#151E293B" />
+
+    <!-- Central Squircle Base (App Icon Theme) -->
+    <path
+        android:pathData="M 40,42 C 40,32 48,24 58,24 L 102,24 C 112,24 120,32 120,42 L 120,118 C 120,128 112,136 102,136 L 58,136 C 48,136 40,128 40,118 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="40"
+                android:startY="24"
+                android:endX="120"
+                android:endY="136"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#2563EB" />
+                <item android:offset="1.0" android:color="#1D4ED8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle Inner Highlight on Central Squircle -->
+    <path
+        android:pathData="M 42,42 C 42,33.5 49,26.5 58,26.5 L 102,26.5 C 111,26.5 118,33.5 118,42 L 118,70 L 42,70 Z"
+        android:fillColor="#1AFFFFFF" />
+
+    <!-- Tray / Slot at Bottom of Plate (Identical to Truedown App Icon Base) -->
+    <path
+        android:pathData="M 64,112 C 62.9,112 62,112.9 62,114 C 62,115.1 62.9,116 64,116 L 96,116 C 97.1,116 98,115.1 98,114 C 98,112.9 97.1,112 96,112 Z"
+        android:fillColor="#93C5FD" />
+
+    <!-- Main Downward Arrow Stem & Head (Truedown App Icon Signature) -->
+    <!-- Left Wing -->
+    <path
+        android:pathData="M 62,54 L 80,54 L 80,98 L 64.5,82.5 C 63.5,81.5 63.5,80.5 64.5,79.5 L 73,79.5 L 73,64 L 62,64 C 59.24,64 57,61.76 57,59 C 57,56.24 59.24,54 62,54 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Right Wing -->
+    <path
+        android:pathData="M 80,54 L 98,54 C 100.76,54 103,56.24 103,59 C 103,61.76 100.76,64 98,64 L 87,64 L 87,79.5 L 95.5,79.5 C 96.5,80.5 96.5,81.5 95.5,82.5 L 80,98 Z"
+        android:fillColor="#E0E7FF" />
+
+    <!-- Floating Top-Right Mini Badge (Video / Reel Motif) -->
+    <path
+        android:pathData="M 116,36 C 116,30.5 120.5,26 126,26 L 138,26 C 143.5,26 148,30.5 148,36 L 148,48 C 148,53.5 143.5,58 138,58 L 126,58 C 120.5,58 116,53.5 116,48 Z"
+        android:fillColor="#0F172A" />
+    <path
+        android:pathData="M 116,36 C 116,30.5 120.5,26 126,26 L 138,26 C 143.5,26 148,30.5 148,36 L 148,48 C 148,53.5 143.5,58 138,58 L 126,58 C 120.5,58 116,53.5 116,48 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#38BDF8" />
+    <!-- Play Triangle Inside Mini Badge -->
+    <path
+        android:pathData="M 129,36 L 138,42 L 129,48 Z"
+        android:fillColor="#38BDF8" />
+
+    <!-- Floating Bottom-Left Mini Badge (Music Note Motif) -->
+    <path
+        android:pathData="M 14,104 C 14,98.5 18.5,94 24,94 L 36,94 C 41.5,94 46,98.5 46,104 L 46,116 C 46,121.5 41.5,126 36,126 L 24,126 C 18.5,126 14,121.5 14,116 Z"
+        android:fillColor="#0F172A" />
+    <path
+        android:pathData="M 14,104 C 14,98.5 18.5,94 24,94 L 36,94 C 41.5,94 46,98.5 46,104 L 46,116 C 46,121.5 41.5,126 36,126 L 24,126 C 18.5,126 14,121.5 14,116 Z"
+        android:strokeWidth="1.5"
+        android:strokeColor="#818CF8" />
+    <!-- Note Icon Inside Mini Badge -->
+    <path
+        android:pathData="M 33,103 L 28,104.5 L 28,113.5 C 27.4,113.2 26.7,113 26,113 C 24.3,113 23,114.1 23,115.5 C 23,116.9 24.3,118 26,118 C 27.7,118 29,116.9 29,115.5 L 29,106.8 L 33,105.6 L 33,111.5 C 32.4,111.2 31.7,111 31,111 C 29.3,111 28,112.1 28,113.5 C 28,114.9 29.3,116 31,116 C 32.7,116 34,114.9 34,113.5 L 34,103 Z"
+        android:fillColor="#818CF8" />
+
+    <!-- Little Sparkle Accents -->
+    <path
+        android:pathData="M 28,42 L 30,37 L 35,35 L 30,33 L 28,28 L 26,33 L 21,35 L 26,37 Z"
+        android:fillColor="#60A5FA" />
+    <path
+        android:pathData="M 132,108 L 133.5,104.5 L 137,103 L 133.5,101.5 L 132,98 L 130.5,101.5 L 127,103 L 130.5,104.5 Z"
+        android:fillColor="#93C5FD" />
+</vector>

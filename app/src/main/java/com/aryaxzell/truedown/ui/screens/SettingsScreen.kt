@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -258,6 +259,33 @@ fun SettingsScreen(
                     testTag = "settings_language_row",
                     iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     iconTint = MaterialTheme.colorScheme.tertiary
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Haptic Feedback Switch
+                SettingsSwitchRow(
+                    icon = Icons.Default.Vibration,
+                    title = stringResource(R.string.settings_haptic_title),
+                    subtitle = if (preferences.hapticFeedback) {
+                        stringResource(R.string.settings_haptic_desc_on)
+                    } else {
+                        stringResource(R.string.settings_haptic_desc_off)
+                    },
+                    checked = preferences.hapticFeedback,
+                    enabled = true,
+                    onCheckedChange = { enabled ->
+                        viewModel.updateHapticFeedback(enabled)
+                        if (enabled) {
+                            com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerSuccess(context, true)
+                        }
+                    },
+                    testTag = "settings_haptic_feedback_switch",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -539,7 +567,12 @@ fun SettingsScreen(
                     icon = Icons.Default.History,
                     title = "Riwayat Pembaruan Aplikasi",
                     subtitle = "Lihat status keberhasilan pembaruan sebelumnya",
-                    onClick = { showUpdateHistoryDialog = true },
+                    onClick = {
+                        scope.launch {
+                            com.aryaxzell.truedown.util.UpdateHistoryLogger.ensureVersionHistoryInitialized(context)
+                        }
+                        showUpdateHistoryDialog = true
+                    },
                     testTag = "settings_update_history_row",
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     iconTint = MaterialTheme.colorScheme.primary
@@ -1069,6 +1102,11 @@ fun SettingsScreen(
         StorageCleanerModal(
             autoClearOnExit = preferences.autoClearCacheOnExit,
             onToggleAutoClear = { enabled -> viewModel.updateAutoClearCacheOnExit(enabled) },
+            onCacheCleared = { freedStr ->
+                scope.launch {
+                    snackbarHostState.showSnackbar("Cache media sebesar $freedStr berhasil dibersihkan")
+                }
+            },
             onDismiss = { showStorageCleanerModal = false }
         )
     }

@@ -64,6 +64,15 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- BroadcastReceiver for Update Cancellation from Notification -->
+        <receiver
+            android:name=".util.AppUpdateCancelReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.aryaxzell.truedown.ACTION_CANCEL_APP_UPDATE" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

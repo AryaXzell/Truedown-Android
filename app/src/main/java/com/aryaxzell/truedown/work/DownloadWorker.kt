@@ -158,6 +158,9 @@ class DownloadWorker(
                 showActions = prefs.showNotificationActions
             )
 
+            // Trigger tactile haptic feedback alert on successful download completion
+            com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerSuccess(appContext, prefs.hapticFeedback)
+
             Result.success(workDataOf("uri" to downloadResult.uri.toString()))
         } else {
             val err = result.exceptionOrNull()?.localizedMessage ?: "Gagal mengunduh"

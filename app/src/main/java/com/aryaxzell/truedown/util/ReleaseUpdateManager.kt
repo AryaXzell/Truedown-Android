@@ -8,6 +8,8 @@ import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.aryaxzell.truedown.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,12 +60,21 @@ object ReleaseUpdateManager {
     private val _updateState = MutableStateFlow<ReleaseUpdateState>(ReleaseUpdateState.Idle)
     val updateState: StateFlow<ReleaseUpdateState> = _updateState.asStateFlow()
 
+    private var currentCall: okhttp3.Call? = null
+    private var currentJob: kotlinx.coroutines.Job? = null
+    @Volatile
+    private var isCancelled: Boolean = false
+
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .connectionPool(okhttp3.ConnectionPool(5, 5, TimeUnit.MINUTES))
+            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
             .build()
     }
 
@@ -89,14 +100,30 @@ object ReleaseUpdateManager {
         }
     }
 
-    fun resetState() {
+    fun cancelDownload(context: Context? = null) {
+        isCancelled = true
+        try {
+            currentCall?.cancel()
+        } catch (_: Exception) {}
+        currentCall = null
+        currentJob?.cancel()
+        currentJob = null
         _updateState.value = ReleaseUpdateState.Idle
+        context?.let {
+            cleanupUpdateFiles(it)
+            NotificationHelper.cancelUpdateNotification(it)
+        }
+        AppLogger.i("ReleaseUpdate", "Pengunduhan update rilis stabil dibatalkan oleh pengguna.")
+    }
+
+    fun resetState() {
+        cancelDownload()
     }
 
     /**
      * Memeriksa rilis stabil terbaru dari GitHub Release API.
      */
-    suspend fun checkForReleaseUpdate(): Result<ReleaseUpdateState.UpdateAvailable> = withContext(Dispatchers.IO) {
+    suspend fun checkForReleaseUpdate(context: Context? = null): Result<ReleaseUpdateState.UpdateAvailable> = withContext(Dispatchers.IO) {
         _updateState.value = ReleaseUpdateState.Checking
         AppLogger.i("ReleaseUpdate", "Memeriksa rilis stabil terbaru dari GitHub Releases...")
 
@@ -111,6 +138,9 @@ object ReleaseUpdateManager {
             if (!response.isSuccessful) {
                 val err = "Gagal memeriksa rilis terbaru (HTTP ${response.code})"
                 _updateState.value = ReleaseUpdateState.Error(err)
+                if (context != null) {
+                    UpdateHistoryLogger.logAttempt(context, "v${BuildConfig.VERSION_NAME}", "Stable Check", "Failed", err)
+                }
                 return@withContext Result.failure(Exception(err))
             }
 
@@ -119,7 +149,8 @@ object ReleaseUpdateManager {
 
             val tagName = json.optString("tag_name", "").trim()
             val releaseTitle = json.optString("name", "Truedown Android $tagName")
-            val releaseNotes = json.optString("body", "Pembaruan rilis stabil terbaru.")
+            val rawReleaseNotes = json.optString("body", "")
+            val releaseNotes = ReleaseNotesFormatter.format(rawReleaseNotes)
 
             val currentVersion = BuildConfig.VERSION_NAME
             val cleanCurrent = currentVersion.replace("v", "").trim()
@@ -192,9 +223,15 @@ object ReleaseUpdateManager {
             if (isVersionNewer(cleanLatest, cleanCurrent)) {
                 _updateState.value = updateAvailable
                 AppLogger.i("ReleaseUpdate", "Pembaruan rilis stabil ditemukan: $tagName (Saat ini: $currentVersion)")
+                if (context != null) {
+                    UpdateHistoryLogger.logAttempt(context, tagName, "Stable Check", "Success", "Pembaruan rilis $tagName tersedia untuk diunduh")
+                }
             } else {
                 _updateState.value = ReleaseUpdateState.UpToDate(currentVersion, tagName)
                 AppLogger.i("ReleaseUpdate", "Aplikasi sudah dalam versi terbaru: $currentVersion")
+                if (context != null) {
+                    UpdateHistoryLogger.logAttempt(context, currentVersion, "Stable Check", "Success", "Aplikasi sudah dalam versi terbaru")
+                }
             }
 
             Result.success(updateAvailable)
@@ -202,6 +239,9 @@ object ReleaseUpdateManager {
             AppLogger.e("ReleaseUpdate", "Kendala saat memeriksa rilis stabil dari GitHub API", e)
             val err = e.localizedMessage ?: "Gagal terhubung ke GitHub Release API"
             _updateState.value = ReleaseUpdateState.Error(err)
+            if (context != null) {
+                UpdateHistoryLogger.logAttempt(context, "v${BuildConfig.VERSION_NAME}", "Stable Check", "Failed", err)
+            }
             Result.failure(e)
         }
     }
@@ -211,10 +251,14 @@ object ReleaseUpdateManager {
      */
     suspend fun downloadAndInstallRelease(context: Context, updateInfo: ReleaseUpdateState.UpdateAvailable) {
         withContext(Dispatchers.IO) {
+            currentJob = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
+            isCancelled = false
             val updateDir = File(context.cacheDir, "release_update").apply { mkdirs() }
             val apkFile = File(updateDir, "truedown_release_${updateInfo.tag}_${updateInfo.selectedAbi}.apk")
 
             try {
+                if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) return@withContext
+
                 // Periksa ketersediaan penyimpanan internal perangkat
                 if (!StorageUtil.hasEnoughStorageSpace(updateDir, updateInfo.apkSizeBytes)) {
                     val availableSpaceText = android.text.format.Formatter.formatFileSize(context, StorageUtil.getAvailableStorageBytes(updateDir))
@@ -228,26 +272,24 @@ object ReleaseUpdateManager {
                 _updateState.value = ReleaseUpdateState.Downloading(0f, 0L, updateInfo.apkSizeBytes)
                 AppLogger.i("ReleaseUpdate", "Mengunduh langsung APK Rilis ${updateInfo.tag} (${updateInfo.selectedAbi}) dari: ${updateInfo.apkUrl}")
 
-                val response = UpdateHistoryLogger.runWithExponentialBackoff(
-                    maxRetries = 3,
-                    initialDelayMs = 1500L,
-                    onRetry = { attempt, delayMs, ex ->
-                        AppLogger.w("ReleaseUpdate", "Koneksi terputus (Upaya $attempt/3). Mencoba kembali dalam ${delayMs}ms...: ${ex.localizedMessage}")
-                    }
-                ) {
-                    val req = Request.Builder()
-                        .url(updateInfo.apkUrl)
-                        .header("User-Agent", "Truedown-Android-App")
-                        .build()
-                    val resp = client.newCall(req).execute()
-                    if (!resp.isSuccessful) {
-                        throw Exception("Gagal mengunduh APK Rilis (HTTP ${resp.code})")
-                    }
-                    resp
+                val req = Request.Builder()
+                    .url(updateInfo.apkUrl)
+                    .header("User-Agent", "Truedown-Android-App")
+                    .header("Accept-Encoding", "identity")
+                    .header("Connection", "keep-alive")
+                    .build()
+                val call = client.newCall(req)
+                currentCall = call
+                val response = call.execute()
+
+                if (!response.isSuccessful) {
+                    if (isCancelled) return@withContext
+                    throw Exception("Gagal mengunduh APK Rilis (HTTP ${response.code})")
                 }
 
                 val body = response.body
                 if (body == null) {
+                    if (isCancelled) return@withContext
                     val err = "Response body kosong saat mengunduh APK"
                     _updateState.value = ReleaseUpdateState.Error(err)
                     UpdateHistoryLogger.logAttempt(context, updateInfo.tag, "Stable", "Failed", err)
@@ -255,10 +297,10 @@ object ReleaseUpdateManager {
                 }
 
                 val contentLength = if (body.contentLength() > 0) body.contentLength() else updateInfo.apkSizeBytes
-                val inputStream: InputStream = body.byteStream()
-                val outputStream = FileOutputStream(apkFile)
+                val inputStream: InputStream = java.io.BufferedInputStream(body.byteStream(), 65536)
+                val outputStream = java.io.BufferedOutputStream(FileOutputStream(apkFile), 65536)
 
-                val buffer = ByteArray(8192)
+                val buffer = ByteArray(65536)
                 var bytesRead: Int
                 var totalBytesRead = 0L
 
@@ -269,6 +311,14 @@ object ReleaseUpdateManager {
                 var remainingSecs = -1L
 
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) {
+                        try { outputStream.close() } catch (_: Exception) {}
+                        try { inputStream.close() } catch (_: Exception) {}
+                        if (apkFile.exists()) apkFile.delete()
+                        AppLogger.i("ReleaseUpdate", "Pengunduhan rilis stabil dibatalkan.")
+                        return@withContext
+                    }
+
                     outputStream.write(buffer, 0, bytesRead)
                     totalBytesRead += bytesRead
 
@@ -286,19 +336,37 @@ object ReleaseUpdateManager {
                         }
                     }
 
-                    val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
-                    _updateState.value = ReleaseUpdateState.Downloading(
-                        progress = progress,
-                        downloadedBytes = totalBytesRead,
-                        totalBytes = contentLength,
-                        speedBytesPerSec = currentSpeedBytesPerSec,
-                        remainingSeconds = remainingSecs
-                    )
+                    if (!isCancelled) {
+                        val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
+                        _updateState.value = ReleaseUpdateState.Downloading(
+                            progress = progress,
+                            downloadedBytes = totalBytesRead,
+                            totalBytes = contentLength,
+                            speedBytesPerSec = currentSpeedBytesPerSec,
+                            remainingSeconds = remainingSecs
+                        )
+
+                        if (timeDelta >= 400) {
+                            NotificationHelper.showUpdateProgressNotification(
+                                context = context,
+                                title = "Mengunduh Versi Rilis (${updateInfo.tag})",
+                                progress = progress,
+                                downloadedBytes = totalBytesRead,
+                                totalBytes = contentLength,
+                                speedBytesPerSec = currentSpeedBytesPerSec
+                            )
+                        }
+                    }
                 }
 
                 outputStream.flush()
                 outputStream.close()
                 inputStream.close()
+
+                if (isCancelled) {
+                    if (apkFile.exists()) apkFile.delete()
+                    return@withContext
+                }
 
                 AppLogger.i("ReleaseUpdate", "Pengunduhan APK Rilis selesai (${apkFile.length()} bytes)")
 
@@ -306,12 +374,20 @@ object ReleaseUpdateManager {
                     val err = "File APK terunduh tidak lengkap (${apkFile.length()} bytes). Silakan coba lagi."
                     _updateState.value = ReleaseUpdateState.Error(err)
                     AppLogger.e("ReleaseUpdate", err)
+                    NotificationHelper.showUpdateErrorNotification(context, err)
                     return@withContext
                 }
 
                 // 3. Verifikasi SHA-256 jika URL tersedia
-                if (updateInfo.sha256Url.isNotBlank()) {
+                if (updateInfo.sha256Url.isNotBlank() && !isCancelled) {
                     _updateState.value = ReleaseUpdateState.Verifying("Mengunduh checksum SHA-256 resmi...")
+                    NotificationHelper.showUpdateProgressNotification(
+                        context = context,
+                        title = "Memverifikasi Keamanan APK...",
+                        progress = 1f,
+                        downloadedBytes = apkFile.length(),
+                        totalBytes = apkFile.length()
+                    )
                     AppLogger.i("ReleaseUpdate", "Mengunduh file checksum dari: ${updateInfo.sha256Url}")
 
                     val shaRequest = Request.Builder()
@@ -319,14 +395,15 @@ object ReleaseUpdateManager {
                         .header("User-Agent", "Truedown-Android-App")
                         .build()
 
-                    val shaResponse = client.newCall(shaRequest).execute()
+                    val shaCall = client.newCall(shaRequest)
+                    currentCall = shaCall
+                    val shaResponse = shaCall.execute()
                     if (shaResponse.isSuccessful) {
                         val shaBody = shaResponse.body?.string() ?: ""
-                        // Ekstrak 64 hex karakter pertama dari teks
                         val matchResult = Regex("[a-fA-F0-9]{64}").find(shaBody)
                         val expectedSha = matchResult?.value?.lowercase()
 
-                        if (expectedSha != null) {
+                        if (expectedSha != null && !isCancelled) {
                             _updateState.value = ReleaseUpdateState.Verifying("Menghitung checksum berkas APK...")
                             val actualSha = calculateSha256(apkFile).lowercase()
 
@@ -341,29 +418,42 @@ object ReleaseUpdateManager {
                                     apkFile.delete()
                                 }
                                 UpdateHistoryLogger.logAttempt(context, updateInfo.tag, "Stable", "Failed", err)
+                                NotificationHelper.showUpdateErrorNotification(context, err)
                                 return@withContext
                             }
                             AppLogger.i("ReleaseUpdate", "Verifikasi SHA-256 berhasil!")
-                        } else {
-                            AppLogger.w("ReleaseUpdate", "Format file .sha256 di GitHub tidak dikenali atau kosong")
                         }
-                    } else {
-                        AppLogger.w("ReleaseUpdate", "Gagal mengunduh berkas checksum (HTTP ${shaResponse.code}). Melompati verifikasi.")
                     }
                 }
 
-                _updateState.value = ReleaseUpdateState.ReadyToInstall(apkFile, updateInfo.selectedAbi)
-                UpdateHistoryLogger.logAttempt(context, updateInfo.tag, "Stable", "Success")
+                if (!isCancelled) {
+                    _updateState.value = ReleaseUpdateState.ReadyToInstall(apkFile, updateInfo.selectedAbi)
+                    UpdateHistoryLogger.logAttempt(context, updateInfo.tag, "Stable", "Success")
+                    NotificationHelper.showUpdateReadyNotification(context, apkFile, updateInfo.tag)
 
-                withContext(Dispatchers.Main) {
-                    installApk(context, apkFile)
+                    withContext(Dispatchers.Main) {
+                        installApk(context, apkFile)
+                    }
                 }
 
             } catch (e: Exception) {
+                if (isCancelled || e is kotlinx.coroutines.CancellationException || e is java.io.InterruptedIOException) {
+                    AppLogger.i("ReleaseUpdate", "Pengunduhan update rilis stabil berhasil dibatalkan.")
+                    _updateState.value = ReleaseUpdateState.Idle
+                    return@withContext
+                }
                 AppLogger.e("ReleaseUpdate", "Kendala saat mengunduh rilis stabil", e)
                 val errMsg = e.localizedMessage ?: "Gagal mengunduh berkas rilis"
                 _updateState.value = ReleaseUpdateState.Error(errMsg)
                 UpdateHistoryLogger.logAttempt(context, updateInfo.tag, "Stable", "Failed", errMsg)
+                NotificationHelper.showUpdateErrorNotification(context, errMsg)
+            } finally {
+                currentCall = null
+                currentJob = null
+                if (isCancelled) {
+                    _updateState.value = ReleaseUpdateState.Idle
+                    if (apkFile.exists()) apkFile.delete()
+                }
             }
         }
     }

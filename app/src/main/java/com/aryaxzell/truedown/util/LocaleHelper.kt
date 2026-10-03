@@ -9,12 +9,16 @@ import java.util.Locale
 
 object LocaleHelper {
 
-    fun setLocale(context: Context, languageCode: String): Context {
-        val targetLocale = when (languageCode.uppercase()) {
+    fun getLocale(languageCode: String): Locale? {
+        return when (languageCode.uppercase()) {
             "ID", "INDONESIA", "INDONESIAN" -> Locale("in", "ID")
             "EN", "ENGLISH" -> Locale.ENGLISH
             else -> null
         }
+    }
+
+    fun setLocale(context: Context, languageCode: String): Context {
+        val targetLocale = getLocale(languageCode)
 
         if (targetLocale == null) {
             Locale.setDefault(Locale.getDefault())
@@ -34,12 +38,22 @@ object LocaleHelper {
         return context.createConfigurationContext(config)
     }
 
-    fun applyLanguage(activity: Activity, languageCode: String) {
-        val targetLocale = when (languageCode.uppercase()) {
-            "ID", "INDONESIA", "INDONESIAN" -> Locale("in", "ID")
-            "EN", "ENGLISH" -> Locale.ENGLISH
-            else -> null
+    fun getLocalizedConfiguration(context: Context, languageCode: String): Configuration {
+        val targetLocale = getLocale(languageCode) ?: Locale.getDefault()
+        Locale.setDefault(targetLocale)
+
+        val config = Configuration(context.resources.configuration)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            config.setLocales(LocaleList(targetLocale))
+        } else {
+            @Suppress("DEPRECATION")
+            config.locale = targetLocale
         }
+        return config
+    }
+
+    fun applyLanguage(activity: Activity, languageCode: String) {
+        val targetLocale = getLocale(languageCode)
 
         if (targetLocale != null) {
             Locale.setDefault(targetLocale)

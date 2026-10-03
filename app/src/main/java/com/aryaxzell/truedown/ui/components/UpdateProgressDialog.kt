@@ -50,11 +50,7 @@ fun UpdateProgressDialog(
     onConfirm: () -> Unit
 ) {
     AlertDialog(
-        onDismissRequest = {
-            if (errorMessage != null || isReady || isChecking) {
-                onDismiss()
-            }
-        },
+        onDismissRequest = onDismiss,
         shape = RoundedCornerShape(26.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         icon = {

@@ -49,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -101,6 +102,7 @@ fun SlideshowGridScreen(
 
     val selectedCount = selectedMap.values.count { it }
     val isAllSelected = selectedCount == totalPhotos
+    val preferences by viewModel.preferences.collectAsState()
 
     BackHandler {
         onBack()
@@ -169,6 +171,7 @@ fun SlideshowGridScreen(
                 ) {
                     Button(
                         onClick = {
+                            com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                             val selectedIndices = selectedMap.filter { it.value }.keys.toList()
                             viewModel.startDownload(post, downloadMp3Only = false, selectedPhotoIndices = selectedIndices)
                             scope.launch {
@@ -200,6 +203,7 @@ fun SlideshowGridScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         FilledTonalButton(
                             onClick = {
+                                com.aryaxzell.truedown.util.HapticFeedbackHelper.triggerClick(context, preferences.hapticFeedback)
                                 viewModel.startDownload(post, downloadMp3Only = true)
                                 scope.launch {
                                     snackbarHostState.showSnackbar("Mengunduh MP3…")

@@ -55,6 +55,7 @@ import java.io.File
 fun StorageCleanerModal(
     autoClearOnExit: Boolean,
     onToggleAutoClear: (Boolean) -> Unit,
+    onCacheCleared: (String) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -94,8 +95,10 @@ fun StorageCleanerModal(
             val freedStr = if (initialSize > 0) initialSize.toHumanReadableSize() else "0 B"
             withContext(Dispatchers.Main) {
                 isCleaning = false
-                calculateSizes()
-                Toast.makeText(context, "Cache media sebesar $freedStr berhasil dibersihkan!", Toast.LENGTH_SHORT).show()
+                val message = "Cache media sebesar $freedStr berhasil dibersihkan!"
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                onCacheCleared(freedStr)
+                onDismiss()
             }
         }
     }

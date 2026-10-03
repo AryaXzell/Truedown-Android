@@ -7,6 +7,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,12 +56,21 @@ object NightlyUpdateManager {
     private val _updateState = MutableStateFlow<NightlyUpdateState>(NightlyUpdateState.Idle)
     val updateState: StateFlow<NightlyUpdateState> = _updateState.asStateFlow()
 
+    private var currentCall: okhttp3.Call? = null
+    private var currentJob: kotlinx.coroutines.Job? = null
+    @Volatile
+    private var isCancelled: Boolean = false
+
     private val client by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
+            .retryOnConnectionFailure(true)
+            .connectionPool(okhttp3.ConnectionPool(5, 5, TimeUnit.MINUTES))
+            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
             .build()
     }
 
@@ -85,8 +96,24 @@ object NightlyUpdateManager {
         }
     }
 
-    fun resetState() {
+    fun cancelDownload(context: Context? = null) {
+        isCancelled = true
+        try {
+            currentCall?.cancel()
+        } catch (_: Exception) {}
+        currentCall = null
+        currentJob?.cancel()
+        currentJob = null
         _updateState.value = NightlyUpdateState.Idle
+        context?.let {
+            cleanupUpdateFiles(it)
+            NotificationHelper.cancelUpdateNotification(it)
+        }
+        AppLogger.i("NightlyUpdate", "Pengunduhan Nightly dibatalkan oleh pengguna.")
+    }
+
+    fun resetState() {
+        cancelDownload()
     }
 
     /**
@@ -151,11 +178,15 @@ object NightlyUpdateManager {
 
     suspend fun downloadAndInstallNightly(context: Context) {
         withContext(Dispatchers.IO) {
+            currentJob = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
+            isCancelled = false
             val updateDir = File(context.cacheDir, "nightly_update").apply { mkdirs() }
             val zipFile = File(updateDir, "nightly_artifact.zip")
             var extractedApk: File? = null
 
             try {
+                if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) return@withContext
+
                 // 1. Cek ketersediaan build Nightly terbaru dahulu
                 _updateState.value = NightlyUpdateState.Checking
                 val deviceAbi = getDeviceCpuAbi()
@@ -166,6 +197,8 @@ object NightlyUpdateManager {
                     val runId = runJson.optString("id", "")
                     AppLogger.i("NightlyUpdate", "Konfirmasi build aktif untuk diunduh: Run #$runId")
                 }
+
+                if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) return@withContext
 
                 // 1.5. Periksa ketersediaan penyimpanan internal perangkat
                 val estimatedSize = 30L * 1024 * 1024 // Estimasi 30 MB untuk ZIP
@@ -195,6 +228,8 @@ object NightlyUpdateManager {
                 var downloadedDirectApk: File? = null
 
                 for (targetUrl in candidateUrls) {
+                    if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) return@withContext
+
                     AppLogger.i("NightlyUpdate", "Mencoba mengunduh artefak dari: $targetUrl")
                     _updateState.value = NightlyUpdateState.Downloading(0f, 0L, 0L)
 
@@ -203,7 +238,9 @@ object NightlyUpdateManager {
                             .url(targetUrl)
                             .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) Truedown-Android-App")
                             .build()
-                        val resp = client.newCall(req).execute()
+                        val call = client.newCall(req)
+                        currentCall = call
+                        val resp = call.execute()
 
                         if (resp.isSuccessful) {
                             val body = resp.body
@@ -211,10 +248,10 @@ object NightlyUpdateManager {
 
                             if (body != null && !contentType.contains("text/html")) {
                                 val contentLength = body.contentLength()
-                                val inputStream = body.byteStream()
-                                val outputStream = FileOutputStream(zipFile)
+                                val inputStream = java.io.BufferedInputStream(body.byteStream(), 65536)
+                                val outputStream = java.io.BufferedOutputStream(FileOutputStream(zipFile), 65536)
 
-                                val buffer = ByteArray(8192)
+                                val buffer = ByteArray(65536)
                                 var bytesRead: Int
                                 var totalBytesRead = 0L
                                 val startTime = System.currentTimeMillis()
@@ -224,6 +261,14 @@ object NightlyUpdateManager {
                                 var remainingSecs = -1L
 
                                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                    if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                        try { outputStream.close() } catch (_: Exception) {}
+                                        try { inputStream.close() } catch (_: Exception) {}
+                                        if (zipFile.exists()) zipFile.delete()
+                                        AppLogger.i("NightlyUpdate", "Unduhan dihentikan karena pembatalan pengguna.")
+                                        return@withContext
+                                    }
+
                                     outputStream.write(buffer, 0, bytesRead)
                                     totalBytesRead += bytesRead
 
@@ -241,21 +286,34 @@ object NightlyUpdateManager {
                                         }
                                     }
 
-                                    val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
-                                    _updateState.value = NightlyUpdateState.Downloading(
-                                        progress = progress,
-                                        downloadedBytes = totalBytesRead,
-                                        totalBytes = contentLength,
-                                        speedBytesPerSec = currentSpeedBytesPerSec,
-                                        remainingSeconds = remainingSecs
-                                    )
+                                    if (!isCancelled) {
+                                        val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
+                                        _updateState.value = NightlyUpdateState.Downloading(
+                                            progress = progress,
+                                            downloadedBytes = totalBytesRead,
+                                            totalBytes = contentLength,
+                                            speedBytesPerSec = currentSpeedBytesPerSec,
+                                            remainingSeconds = remainingSecs
+                                        )
+
+                                        if (timeDelta >= 400) {
+                                            NotificationHelper.showUpdateProgressNotification(
+                                                context = context,
+                                                title = "Mengunduh Versi Nightly",
+                                                progress = progress,
+                                                downloadedBytes = totalBytesRead,
+                                                totalBytes = contentLength,
+                                                speedBytesPerSec = currentSpeedBytesPerSec
+                                            )
+                                        }
+                                    }
                                 }
 
                                 outputStream.flush()
                                 outputStream.close()
                                 inputStream.close()
 
-                                if (zipFile.exists() && zipFile.length() > 50_000L) {
+                                if (!isCancelled && zipFile.exists() && zipFile.length() > 50_000L) {
                                     downloadSuccess = true
                                     AppLogger.i("NightlyUpdate", "Berhasil mengunduh artefak ZIP (${zipFile.length()} bytes)")
                                     break
@@ -263,12 +321,17 @@ object NightlyUpdateManager {
                             }
                         }
                     } catch (e: Exception) {
+                        if (isCancelled) return@withContext
                         AppLogger.w("NightlyUpdate", "Kandidat URL gagal ($targetUrl): ${e.localizedMessage}")
+                    } finally {
+                        currentCall = null
                     }
                 }
 
+                if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) return@withContext
+
                 // Fallback cerdas: Jika artefak nightly.link sudah expired (>14 hari), coba ambil APK terbaru dari GitHub Releases
-                if (!downloadSuccess) {
+                if (!downloadSuccess && !isCancelled) {
                     AppLogger.i("NightlyUpdate", "Artefak nightly.link tidak tersedia/expired. Mencoba fallback ke GitHub Releases...")
                     try {
                         val relReq = Request.Builder()
@@ -276,7 +339,10 @@ object NightlyUpdateManager {
                             .header("User-Agent", "Truedown-Android-App")
                             .header("Accept", "application/vnd.github.v3+json")
                             .build()
-                        val relResp = client.newCall(relReq).execute()
+                        val relCall = client.newCall(relReq)
+                        currentCall = relCall
+                        val relResp = relCall.execute()
+
                         if (relResp.isSuccessful) {
                             val relBody = relResp.body?.string() ?: ""
                             val relArray = org.json.JSONArray(relBody)
@@ -301,36 +367,54 @@ object NightlyUpdateManager {
                                     }
                                 }
 
-                                if (matchedApkUrl != null) {
+                                if (matchedApkUrl != null && !isCancelled) {
                                     AppLogger.i("NightlyUpdate", "Fallback APK ditemukan dari Release: $matchedApkUrl")
                                     val directApkFile = File(updateDir, "truedown_update.apk")
                                     val apkReq = Request.Builder().url(matchedApkUrl).build()
-                                    val apkResp = client.newCall(apkReq).execute()
+                                    val apkCall = client.newCall(apkReq)
+                                    currentCall = apkCall
+                                    val apkResp = apkCall.execute()
 
                                     if (apkResp.isSuccessful && apkResp.body != null) {
                                         val apkBody = apkResp.body!!
-                                        val apkStream = apkBody.byteStream()
-                                        val apkOut = FileOutputStream(directApkFile)
-                                        val apkBuffer = ByteArray(8192)
+                                        val apkStream = java.io.BufferedInputStream(apkBody.byteStream(), 65536)
+                                        val apkOut = java.io.BufferedOutputStream(FileOutputStream(directApkFile), 65536)
+                                        val apkBuffer = ByteArray(65536)
                                         var r: Int
                                         var total = 0L
                                         val len = if (matchedApkSize > 0) matchedApkSize else apkBody.contentLength()
 
                                         while (apkStream.read(apkBuffer).also { r = it } != -1) {
+                                            if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                                try { apkOut.close() } catch (_: Exception) {}
+                                                try { apkStream.close() } catch (_: Exception) {}
+                                                if (directApkFile.exists()) directApkFile.delete()
+                                                return@withContext
+                                            }
+
                                             apkOut.write(apkBuffer, 0, r)
                                             total += r
-                                            val progress = if (len > 0) (total.toFloat() / len.toFloat()).coerceIn(0f, 1f) else 0f
-                                            _updateState.value = NightlyUpdateState.Downloading(
-                                                progress = progress,
-                                                downloadedBytes = total,
-                                                totalBytes = len
-                                            )
+                                            if (!isCancelled) {
+                                                val progress = if (len > 0) (total.toFloat() / len.toFloat()).coerceIn(0f, 1f) else 0f
+                                                _updateState.value = NightlyUpdateState.Downloading(
+                                                    progress = progress,
+                                                    downloadedBytes = total,
+                                                    totalBytes = len
+                                                )
+                                                NotificationHelper.showUpdateProgressNotification(
+                                                    context = context,
+                                                    title = "Mengunduh Versi Nightly (Fallback)",
+                                                    progress = progress,
+                                                    downloadedBytes = total,
+                                                    totalBytes = len
+                                                )
+                                            }
                                         }
                                         apkOut.flush()
                                         apkOut.close()
                                         apkStream.close()
 
-                                        if (directApkFile.exists() && directApkFile.length() > 100_000L) {
+                                        if (!isCancelled && directApkFile.exists() && directApkFile.length() > 100_000L) {
                                             downloadedDirectApk = directApkFile
                                             downloadSuccess = true
                                         }
@@ -339,25 +423,43 @@ object NightlyUpdateManager {
                             }
                         }
                     } catch (e: Exception) {
+                        if (isCancelled) return@withContext
                         AppLogger.w("NightlyUpdate", "Fallback release gagal: ${e.localizedMessage}")
+                    } finally {
+                        currentCall = null
                     }
                 }
+
+                if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) return@withContext
 
                 if (!downloadSuccess) {
                     val err = "Artefak Nightly di GitHub belum tersedia atau masa simpan (14 hari) telah berakhir. Silakan gunakan tombol Buka di Browser atau perbarui lewat Saluran Stabil."
                     _updateState.value = NightlyUpdateState.Error(err)
                     AppLogger.e("NightlyUpdate", err)
                     UpdateHistoryLogger.logAttempt(context, "Nightly", "Nightly", "Failed", err)
+                    NotificationHelper.showUpdateErrorNotification(context, err)
                     return@withContext
                 }
 
                 // 3. Ekstrak ZIP jika berupa berkas ZIP atau gunakan APK langsung
                 if (downloadedDirectApk != null && downloadedDirectApk.exists()) {
                     extractedApk = downloadedDirectApk
-                    _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
-                    UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
+                    if (!isCancelled) {
+                        _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
+                        UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
+                        NotificationHelper.showUpdateReadyNotification(context, extractedApk, "Nightly ($deviceAbi)")
+                    }
                 } else {
+                    if (isCancelled) return@withContext
+
                     _updateState.value = NightlyUpdateState.Extracting("Mengekstrak dan memilih APK untuk arsitektur $deviceAbi...")
+                    NotificationHelper.showUpdateProgressNotification(
+                        context = context,
+                        title = "Mengekstrak Berkas Nightly...",
+                        progress = 1f,
+                        downloadedBytes = zipFile.length(),
+                        totalBytes = zipFile.length()
+                    )
 
                     data class ApkCandidate(
                         val entryName: String,
@@ -372,12 +474,17 @@ object NightlyUpdateManager {
                         var entry: ZipEntry? = zipInputStream.nextEntry
 
                         while (entry != null) {
+                            if (isCancelled || !kotlinx.coroutines.currentCoroutineContext().isActive) {
+                                zipInputStream.close()
+                                return@withContext
+                            }
+
                             val entryName = entry.name
                             if (!entry.isDirectory && entryName.endsWith(".apk", ignoreCase = true)) {
                                 val candidateFile = File(updateDir, "extracted_${apkCandidates.size}.apk")
-                                val apkOut = FileOutputStream(candidateFile)
+                                val apkOut = java.io.BufferedOutputStream(FileOutputStream(candidateFile), 65536)
 
-                                val apkBuffer = ByteArray(8192)
+                                val apkBuffer = ByteArray(65536)
                                 var apkBytesRead: Int
                                 while (zipInputStream.read(apkBuffer).also { apkBytesRead = it } != -1) {
                                     apkOut.write(apkBuffer, 0, apkBytesRead)
@@ -403,6 +510,7 @@ object NightlyUpdateManager {
                         zipInputStream.close()
 
                     } catch (e: ZipException) {
+                        if (isCancelled) return@withContext
                         val err = "File ZIP artefak rusak atau terpotong saat pengunduhan. Silakan unduh ulang."
                         _updateState.value = NightlyUpdateState.Error(err)
                         AppLogger.e("NightlyUpdate", err, e)
@@ -412,6 +520,8 @@ object NightlyUpdateManager {
                     if (zipFile.exists()) {
                         zipFile.delete()
                     }
+
+                    if (isCancelled) return@withContext
 
                     if (apkCandidates.isEmpty()) {
                         val err = "Artefak terunduh tidak berisi berkas .apk. Silakan coba lagi nanti."
@@ -429,24 +539,38 @@ object NightlyUpdateManager {
                     }
 
                     extractedApk = finalApkFile
-                    AppLogger.i("NightlyUpdate", "Pilihan APK Optimal (${bestCandidate.entryName}) untuk $deviceAbi berhasil disiapkan: ${extractedApk.length()} bytes")
-                    _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
-                    UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
+                    if (!isCancelled) {
+                        AppLogger.i("NightlyUpdate", "Pilihan APK Optimal (${bestCandidate.entryName}) untuk $deviceAbi berhasil disiapkan: ${extractedApk.length()} bytes")
+                        _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
+                        UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
+                        NotificationHelper.showUpdateReadyNotification(context, extractedApk, "Nightly ($deviceAbi)")
+                    }
                 }
 
                 // 4. Jalankan Instalasi APK In-App
-                withContext(Dispatchers.Main) {
-                    extractedApk?.let { installApk(context, it) }
+                if (!isCancelled && extractedApk != null) {
+                    withContext(Dispatchers.Main) {
+                        installApk(context, extractedApk)
+                    }
                 }
 
             } catch (e: Exception) {
+                if (isCancelled || e is kotlinx.coroutines.CancellationException || e is java.io.InterruptedIOException) {
+                    AppLogger.i("NightlyUpdate", "Operasi download Nightly berhasil dibatalkan sepenuhnya.")
+                    _updateState.value = NightlyUpdateState.Idle
+                    return@withContext
+                }
                 AppLogger.e("NightlyUpdate", "Kendala saat proses unduh/ekstrak Nightly", e)
                 val errMsg = e.localizedMessage ?: "Terjadi kendala tidak dikenal"
                 _updateState.value = NightlyUpdateState.Error(errMsg)
                 UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Failed", errMsg)
+                NotificationHelper.showUpdateErrorNotification(context, errMsg)
             } finally {
-                if (zipFile.exists()) {
-                    zipFile.delete()
+                currentCall = null
+                currentJob = null
+                if (isCancelled) {
+                    _updateState.value = NightlyUpdateState.Idle
+                    if (zipFile.exists()) zipFile.delete()
                 }
             }
         }

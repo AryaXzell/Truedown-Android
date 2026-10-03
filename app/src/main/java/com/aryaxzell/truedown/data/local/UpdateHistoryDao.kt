@@ -15,6 +15,12 @@ interface UpdateHistoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertHistory(entity: UpdateHistoryEntity)
 
+    @Query("SELECT COUNT(*) FROM update_history")
+    suspend fun getHistoryCount(): Int
+
+    @Query("SELECT EXISTS(SELECT 1 FROM update_history WHERE versionName = :versionName LIMIT 1)")
+    suspend fun hasVersion(versionName: String): Boolean
+
     @Query("DELETE FROM update_history")
     suspend fun clearHistory()
 }

@@ -146,6 +146,9 @@
     <string name="settings_lang_system">Follow system</string>
     <string name="settings_lang_id">Bahasa Indonesia</string>
     <string name="settings_lang_en">English</string>
+    <string name="settings_haptic_title">Haptic Feedback</string>
+    <string name="settings_haptic_desc_on">Active — Tactile vibration on button clicks &amp; download completion</string>
+    <string name="settings_haptic_desc_off">Disable haptic vibration</string>
 
     <string name="settings_group_download">Downloads</string>
     <string name="settings_default_quality_label">Default video quality</string>
@@ -231,4 +234,9 @@
     <string name="a11y_action_pause_audio">Pause audio</string>
     <string name="a11y_btn_more_options">More options</string>
     <string name="a11y_open_item">Open download</string>
+    <string name="notif_update_downloading">Downloading App Update</string>
+    <string name="notif_update_ready">Update Ready to Install</string>
+    <string name="notif_update_ready_desc">Tap to install version %1$s</string>
+    <string name="notif_update_install_action">Install Now</string>
+    <string name="notif_update_failed">Update Failed</string>
 </resources>

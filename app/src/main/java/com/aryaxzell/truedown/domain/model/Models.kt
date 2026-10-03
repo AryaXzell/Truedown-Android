@@ -84,16 +84,29 @@ sealed class OpenTarget {
     data class Video(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
     data class Audio(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
     data class Slideshow(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
+    data class MediaDeleted(val postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia) : OpenTarget()
     object NotFound : OpenTarget()
 }
 
-fun resolveOpenTarget(postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia): OpenTarget {
+fun resolveOpenTarget(
+    postWithMedia: com.aryaxzell.truedown.data.local.PostWithMedia,
+    context: android.content.Context? = null
+): OpenTarget {
     val items = postWithMedia.mediaItems
+
+    // Periksa apakah media sebelumnya telah diunduh namun kini dihapus dari penyimpanan perangkat
+    if (context != null) {
+        val hasDoneItems = items.any { (it.status == "DONE" || it.status == MediaStatus.DONE.name) && it.mediaStoreUri.isNotBlank() }
+        if (hasDoneItems && !com.aryaxzell.truedown.util.StorageUtil.hasAccessibleMedia(context, postWithMedia)) {
+            return OpenTarget.MediaDeleted(postWithMedia)
+        }
+    }
 
     val hasDoneVideo = items.any {
         (it.kind == MediaKind.VIDEO.name || it.kind == "VIDEO") &&
         (it.status == MediaStatus.DONE.name || it.status == "DONE") &&
-        it.mediaStoreUri.isNotBlank()
+        it.mediaStoreUri.isNotBlank() &&
+        (context == null || com.aryaxzell.truedown.util.StorageUtil.isMediaAccessible(context, it.mediaStoreUri))
     }
     if (hasDoneVideo) {
         return OpenTarget.Video(postWithMedia)
@@ -102,13 +115,15 @@ fun resolveOpenTarget(postWithMedia: com.aryaxzell.truedown.data.local.PostWithM
     val hasDoneAudio = items.any {
         (it.kind == MediaKind.AUDIO.name || it.kind == "AUDIO") &&
         (it.status == MediaStatus.DONE.name || it.status == "DONE") &&
-        it.mediaStoreUri.isNotBlank()
+        it.mediaStoreUri.isNotBlank() &&
+        (context == null || com.aryaxzell.truedown.util.StorageUtil.isMediaAccessible(context, it.mediaStoreUri))
     }
 
     val hasPhotos = items.any {
         (it.kind == MediaKind.PHOTO.name || it.kind == "PHOTO") &&
         (it.status == MediaStatus.DONE.name || it.status == "DONE") &&
-        it.mediaStoreUri.isNotBlank()
+        it.mediaStoreUri.isNotBlank() &&
+        (context == null || com.aryaxzell.truedown.util.StorageUtil.isMediaAccessible(context, it.mediaStoreUri))
     } || postWithMedia.post.type == PostType.SLIDESHOW.name || postWithMedia.post.type == "SLIDESHOW"
 
     if (hasDoneAudio && !hasPhotos) {

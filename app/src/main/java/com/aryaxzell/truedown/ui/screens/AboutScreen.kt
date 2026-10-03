@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -68,9 +69,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aryaxzell.truedown.BuildConfig
 import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.ui.components.ChangelogModal
+import com.aryaxzell.truedown.ui.components.LicenseModal
 import com.aryaxzell.truedown.util.NightlyUpdateManager
 import com.aryaxzell.truedown.util.NightlyUpdateState
 import com.aryaxzell.truedown.util.ReleaseUpdateManager
@@ -90,6 +93,7 @@ fun AboutScreen(
 
     var showNightlyOptionsDialog by remember { mutableStateOf(false) }
     var showChangelogModal by remember { mutableStateOf(false) }
+    var showLicenseModal by remember { mutableStateOf(false) }
 
     BackHandler {
         onBack()
@@ -209,7 +213,7 @@ fun AboutScreen(
                     subtitle = "Periksa dan pasang pembaruan rilis resmi langsung di dalam app",
                     onClick = {
                         scope.launch {
-                            ReleaseUpdateManager.checkForReleaseUpdate()
+                            ReleaseUpdateManager.checkForReleaseUpdate(context)
                         }
                     },
                     testTag = "about_check_update_stable_row",
@@ -263,7 +267,7 @@ fun AboutScreen(
                 AboutClickableRow(
                     icon = Icons.Default.Person,
                     title = "Pengembang Aplikasi",
-                    subtitle = "Arya Xzell (@aryaxzell)",
+                    subtitle = "Arya Vallencia (@aryaxzell)",
                     onClick = {
                         val browserIntent = Intent(
                             Intent.ACTION_VIEW,
@@ -305,22 +309,18 @@ fun AboutScreen(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
                 )
 
-                // License Row
+                // License Row (Opens in-app Full License Modal)
                 AboutClickableRow(
                     icon = Icons.Default.Description,
                     title = "Lisensi Software",
                     subtitle = "MIT License — Perangkat Lunak Bebas & Terbuka",
                     onClick = {
-                        val browserIntent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://github.com/aryaxzell/truedown-android/blob/main/LICENSE")
-                        )
-                        context.startActivity(browserIntent)
+                        showLicenseModal = true
                     },
                     testTag = "about_license_row",
                     iconContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    showExternalIcon = true
+                    showExternalIcon = false
                 )
             }
 
@@ -330,7 +330,7 @@ fun AboutScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
             ) {
                 Text(
-                    text = "Dibuat dengan ❤️ oleh Arya Xzell",
+                    text = "Dibuat dengan ❤️ oleh Arya Vallencia",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -450,8 +450,7 @@ fun AboutScreen(
             isReady = currentState is NightlyUpdateState.ReadyToInstall,
             errorMessage = if (currentState is NightlyUpdateState.Error) currentState.message else null,
             onDismiss = {
-                NightlyUpdateManager.resetState()
-                NightlyUpdateManager.cleanupUpdateFiles(context)
+                NightlyUpdateManager.cancelDownload(context)
             },
             onConfirm = {
                 if (currentState is NightlyUpdateState.ReadyToInstall) {
@@ -535,20 +534,50 @@ fun AboutScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                     textAlign = TextAlign.Center
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = relState.releaseNotes.take(300) + if (relState.releaseNotes.length > 300) "..." else "",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(12.dp)
+                                        text = "Catatan Rilis",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Dapat digulir",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 90.dp, max = 220.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(12.dp)
+                                    ) {
+                                        Text(
+                                            text = relState.releaseNotes,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            lineHeight = 19.sp
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
                                     text = "Arsitektur HP: ${relState.selectedAbi} • Ukuran File: ${formatBytes(relState.apkSizeBytes)}",
                                     style = MaterialTheme.typography.labelSmall,
@@ -618,8 +647,7 @@ fun AboutScreen(
                 isReady = relState is ReleaseUpdateState.ReadyToInstall,
                 errorMessage = if (relState is ReleaseUpdateState.Error) relState.message else null,
                 onDismiss = {
-                    ReleaseUpdateManager.resetState()
-                    ReleaseUpdateManager.cleanupUpdateFiles(context)
+                    ReleaseUpdateManager.cancelDownload(context)
                 },
                 onConfirm = {
                     if (relState is ReleaseUpdateState.ReadyToInstall) {
@@ -634,6 +662,13 @@ fun AboutScreen(
     if (showChangelogModal) {
         ChangelogModal(
             onDismiss = { showChangelogModal = false }
+        )
+    }
+
+    // Software License Modal Dialog
+    if (showLicenseModal) {
+        LicenseModal(
+            onDismiss = { showLicenseModal = false }
         )
     }
 }
