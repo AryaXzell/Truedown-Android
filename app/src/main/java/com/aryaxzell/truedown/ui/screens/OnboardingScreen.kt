@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -114,6 +115,12 @@ fun OnboardingScreen(
         )
     }
 
+    var hasInstallPermission by remember {
+        mutableStateOf(
+            com.aryaxzell.truedown.util.NightlyUpdateManager.canInstallUnknownApps(context)
+        )
+    }
+
     var notifPermissionRequested by remember { mutableStateOf(false) }
 
     val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -144,6 +151,7 @@ fun OnboardingScreen(
                     hasStoragePermission = ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED ||
                             ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
                 }
+                hasInstallPermission = com.aryaxzell.truedown.util.NightlyUpdateManager.canInstallUnknownApps(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -312,6 +320,7 @@ fun OnboardingScreen(
                 3 -> Page4NotificationPermission(
                     hasPermission = hasNotificationPermission,
                     isRequested = notifPermissionRequested,
+                    hasInstallPermission = hasInstallPermission,
                     onRequestPermission = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -328,6 +337,9 @@ fun OnboardingScreen(
                             }
                         }
                         context.startActivity(intent)
+                    },
+                    onRequestInstallPermission = {
+                        com.aryaxzell.truedown.util.NightlyUpdateManager.openInstallPermissionSettings(context)
                     }
                 )
                 4 -> Page5SummaryQuality(
@@ -692,8 +704,10 @@ fun Page3StoragePermission(
 fun Page4NotificationPermission(
     hasPermission: Boolean,
     isRequested: Boolean,
+    hasInstallPermission: Boolean,
     onRequestPermission: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onRequestInstallPermission: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -706,7 +720,7 @@ fun Page4NotificationPermission(
         Surface(
             modifier = Modifier.size(108.dp),
             shape = CircleShape,
-            color = if (hasPermission) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+            color = if (hasPermission && hasInstallPermission) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
             shadowElevation = 4.dp
         ) {
             Box(
@@ -714,9 +728,9 @@ fun Page4NotificationPermission(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Notifications,
+                    imageVector = if (hasPermission && hasInstallPermission) Icons.Default.CheckCircle else Icons.Default.Notifications,
                     contentDescription = null,
-                    tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                    tint = if (hasPermission && hasInstallPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.size(52.dp)
                 )
             }
@@ -725,7 +739,7 @@ fun Page4NotificationPermission(
         Spacer(modifier = Modifier.height(28.dp))
 
         Text(
-            text = stringResource(R.string.onboarding_p4_title),
+            text = "Izin Aplikasi",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center
@@ -734,14 +748,15 @@ fun Page4NotificationPermission(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = stringResource(R.string.onboarding_p4_subtitle),
+            text = "Izin notifikasi dan izin instalasi diperlukan agar aplikasi dapat memberikan progres dan memasang pembaruan secara langsung.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
+        // Notification Permission Card
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = if (hasPermission) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -750,7 +765,7 @@ fun Page4NotificationPermission(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
             Column(
-                modifier = Modifier.padding(22.dp),
+                modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -758,7 +773,7 @@ fun Page4NotificationPermission(
                         imageVector = if (hasPermission) Icons.Default.CheckCircle else Icons.Default.Notifications,
                         contentDescription = null,
                         tint = if (hasPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -769,12 +784,12 @@ fun Page4NotificationPermission(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 if (hasPermission) {
                     Text(
                         text = stringResource(R.string.onboarding_notif_active_desc),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
@@ -787,7 +802,7 @@ fun Page4NotificationPermission(
                         ) {
                             Text(stringResource(R.string.notif_btn_allow), fontWeight = FontWeight.Bold)
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(R.string.notif_denied_hint),
                             style = MaterialTheme.typography.bodySmall,
@@ -802,13 +817,64 @@ fun Page4NotificationPermission(
                         ) {
                             Text(stringResource(R.string.onboarding_btn_open_settings), fontWeight = FontWeight.SemiBold)
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(R.string.onboarding_notif_disabled_note),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center
                         )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Install Unknown Apps Permission Card
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = if (hasInstallPermission) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(24.dp),
+            tonalElevation = 2.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (hasInstallPermission) Icons.Default.CheckCircle else Icons.Default.SystemUpdate,
+                        contentDescription = null,
+                        tint = if (hasInstallPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (hasInstallPermission) "Izin Install Update Aktif" else "Izin Install Update In-App",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "Diperlukan untuk memasang pembaruan aplikasi langsung dari dalam app (seperti versi Nightly).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                if (!hasInstallPermission) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onRequestInstallPermission,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Izinkan Akses Install", fontWeight = FontWeight.Bold)
                     }
                 }
             }

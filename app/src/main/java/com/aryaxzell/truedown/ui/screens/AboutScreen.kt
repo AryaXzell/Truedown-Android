@@ -24,23 +24,37 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +68,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aryaxzell.truedown.BuildConfig
 import com.aryaxzell.truedown.R
+import com.aryaxzell.truedown.util.NightlyUpdateManager
+import com.aryaxzell.truedown.util.NightlyUpdateState
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +79,10 @@ fun AboutScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val updateState by NightlyUpdateManager.updateState.collectAsState()
+
+    var showNightlyOptionsDialog by remember { mutableStateOf(false) }
 
     BackHandler {
         onBack()
@@ -171,23 +193,43 @@ fun AboutScreen(
                 }
             }
 
-            // Pembaruan Aplikasi Section
-            AboutGroupCard(title = "Pembaruan Aplikasi") {
+            // Saluran Pembaruan Versi Section
+            AboutGroupCard(title = "Saluran Pembaruan Versi") {
+                // Saluran Stabil (Official Release)
                 AboutClickableRow(
-                    icon = Icons.Default.SystemUpdate,
-                    title = "Cek Pembaruan",
-                    subtitle = "Periksa dan unduh versi terbaru di GitHub Releases",
+                    icon = Icons.Default.CheckCircle,
+                    title = "Saluran Stabil (Stable Release)",
+                    subtitle = "Versi rilis resmi stabil — Periksa di GitHub Releases",
                     onClick = {
                         val browserIntent = Intent(
                             Intent.ACTION_VIEW,
-                            Uri.parse("https://github.com/aryaxzell/truedown-android/releases")
+                            Uri.parse("https://github.com/AryaXzell/Truedown-Android/releases")
                         )
                         context.startActivity(browserIntent)
                     },
-                    testTag = "about_check_update_row",
+                    testTag = "about_check_update_stable_row",
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     iconTint = MaterialTheme.colorScheme.primary,
                     showExternalIcon = true
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Saluran Nightly (In-App Installer & Browser Options)
+                AboutClickableRow(
+                    icon = Icons.Default.AutoAwesome,
+                    title = "Saluran Nightly (In-App Update)",
+                    subtitle = "Unduh dan pasang build otomatis langsung di dalam app",
+                    onClick = {
+                        showNightlyOptionsDialog = true
+                    },
+                    testTag = "about_check_update_nightly_row",
+                    iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    showExternalIcon = false
                 )
             }
 
@@ -278,6 +320,258 @@ fun AboutScreen(
             }
         }
     }
+
+    // Nightly Update Option Dialog
+    if (showNightlyOptionsDialog) {
+        AlertDialog(
+            onDismissRequest = { showNightlyOptionsDialog = false },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Pembaruan Saluran Nightly",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Pilih metode pengunduhan untuk build prarilis terbaru (Nightly):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Button(
+                        onClick = {
+                            showNightlyOptionsDialog = false
+                            if (!NightlyUpdateManager.canInstallUnknownApps(context)) {
+                                NightlyUpdateManager.openInstallPermissionSettings(context)
+                            } else {
+                                scope.launch {
+                                    NightlyUpdateManager.downloadAndInstallNightly(context)
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Unduh & Install In-App (Langsung)", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            showNightlyOptionsDialog = false
+                            val browserIntent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://nightly.link/AryaXzell/Truedown-Android/workflows/build/main?preview&h=c9122b50d061e55e3d2d601154766a71c9e9de40")
+                            )
+                            context.startActivity(browserIntent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(imageVector = Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Buka Tautan di Browser", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { showNightlyOptionsDialog = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        )
+    }
+
+    // In-App Progress Dialog for Nightly Update
+    if (updateState !is NightlyUpdateState.Idle) {
+        val currentState = updateState
+        AlertDialog(
+            onDismissRequest = {
+                if (currentState is NightlyUpdateState.Error || currentState is NightlyUpdateState.ReadyToInstall) {
+                    NightlyUpdateManager.resetState()
+                    NightlyUpdateManager.cleanupUpdateFiles(context)
+                }
+            },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = {
+                Icon(
+                    imageVector = when (currentState) {
+                        is NightlyUpdateState.Error -> Icons.Default.Warning
+                        is NightlyUpdateState.ReadyToInstall -> Icons.Default.CheckCircle
+                        else -> Icons.Default.Download
+                    },
+                    contentDescription = null,
+                    tint = when (currentState) {
+                        is NightlyUpdateState.Error -> MaterialTheme.colorScheme.error
+                        is NightlyUpdateState.ReadyToInstall -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.tertiary
+                    },
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = when (currentState) {
+                        is NightlyUpdateState.Downloading -> "Mengunduh Nightly Update"
+                        is NightlyUpdateState.Extracting -> "Mengekstrak Artefak ZIP"
+                        is NightlyUpdateState.ReadyToInstall -> "Siap Memasang APK"
+                        is NightlyUpdateState.Error -> "Gagal Memperbarui"
+                        else -> "Pembaruan Aplikasi"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    when (currentState) {
+                        is NightlyUpdateState.Downloading -> {
+                            val percent = (currentState.progress * 100).toInt()
+                            LinearProgressIndicator(
+                                progress = { currentState.progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "$percent% • ${formatBytes(currentState.downloadedBytes)} / ${if (currentState.totalBytes > 0) formatBytes(currentState.totalBytes) else "..."}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Mengunduh file ZIP artefak langsung dari GitHub Nightly Link...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        is NightlyUpdateState.Extracting -> {
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = currentState.status,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Artefak ZIP akan otomatis dihapus setelah APK diekstrak untuk menghemat memori.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.outline,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        is NightlyUpdateState.ReadyToInstall -> {
+                            Text(
+                                text = "File APK berhasil diekstrak dan siap dipasang. Menghubungkan ke installer paket Android...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        is NightlyUpdateState.Error -> {
+                            Text(
+                                text = currentState.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        else -> {}
+                    }
+                }
+            },
+            confirmButton = {
+                when (currentState) {
+                    is NightlyUpdateState.ReadyToInstall -> {
+                        Button(
+                            onClick = {
+                                NightlyUpdateManager.installApk(context, currentState.apkFile)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Buka Installer APK", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    is NightlyUpdateState.Error -> {
+                        Button(
+                            onClick = {
+                                NightlyUpdateManager.resetState()
+                                NightlyUpdateManager.cleanupUpdateFiles(context)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(stringResource(R.string.action_close), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    else -> {}
+                }
+            },
+            dismissButton = {
+                if (currentState is NightlyUpdateState.Downloading || currentState is NightlyUpdateState.Extracting) {
+                    TextButton(
+                        onClick = {
+                            NightlyUpdateManager.resetState()
+                            NightlyUpdateManager.cleanupUpdateFiles(context)
+                        },
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(stringResource(R.string.action_cancel), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        )
+    }
+}
+
+private fun formatBytes(bytes: Long): String {
+    if (bytes <= 0) return "0 B"
+    val units = arrayOf("B", "KB", "MB", "GB")
+    val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
+    return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
 }
 
 @Composable
