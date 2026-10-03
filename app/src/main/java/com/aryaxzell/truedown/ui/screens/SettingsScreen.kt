@@ -128,7 +128,8 @@ fun SettingsScreen(
     var showUpdateHistoryDialog by remember { mutableStateOf(false) }
 
     val db = remember { com.aryaxzell.truedown.data.local.TruedownDatabase.getInstance(context) }
-    val updateHistoryList by db.updateHistoryDao().getAllHistory().collectAsState(initial = emptyList())
+    val updateHistoryFlow = remember(db) { db.updateHistoryDao().getAllHistory() }
+    val updateHistoryList by updateHistoryFlow.collectAsState(initial = emptyList())
 
     val safFolderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -195,10 +196,33 @@ fun SettingsScreen(
             // Card 1: Tampilan
             SettingsGroupCard(title = stringResource(R.string.settings_group_appearance)) {
                 // Theme Option
-                val themeLabel = when (preferences.themeMode) {
-                    "LIGHT" -> stringResource(R.string.settings_theme_light)
-                    "DARK" -> stringResource(R.string.settings_theme_dark)
-                    else -> stringResource(R.string.settings_theme_system)
+                val strLight = stringResource(R.string.settings_theme_light)
+                val strDark = stringResource(R.string.settings_theme_dark)
+                val strAutoTime = stringResource(R.string.settings_theme_auto_time)
+                val strAutoSunset = stringResource(R.string.settings_theme_auto_sunset)
+                val strStatusDark = stringResource(R.string.settings_theme_status_dark)
+                val strStatusLight = stringResource(R.string.settings_theme_status_light)
+                val strSystem = stringResource(R.string.settings_theme_system)
+
+                val themeLabel = remember(preferences.themeMode, context) {
+                    try {
+                        when (preferences.themeMode) {
+                            "LIGHT" -> strLight
+                            "DARK" -> strDark
+                            "AUTO_TIME" -> {
+                                val isDark = com.aryaxzell.truedown.util.AutoThemeHelper.isNightBySystemTime()
+                                "$strAutoTime (${if (isDark) strStatusDark else strStatusLight})"
+                            }
+                            "AUTO_SUNSET" -> {
+                                val isDark = com.aryaxzell.truedown.util.AutoThemeHelper.isNightBySolar(context)
+                                val solar = com.aryaxzell.truedown.util.AutoThemeHelper.calculateSolarTimes(context)
+                                "$strAutoSunset (☀️ ${solar.sunriseFormatted} • 🌙 ${solar.sunsetFormatted})"
+                            }
+                            else -> strSystem
+                        }
+                    } catch (_: Exception) {
+                        strSystem
+                    }
                 }
                 SettingsClickableRow(
                     icon = Icons.Default.Palette,
@@ -722,7 +746,9 @@ fun SettingsScreen(
                     val themes = listOf(
                         "SYSTEM" to stringResource(R.string.settings_theme_system),
                         "LIGHT" to stringResource(R.string.settings_theme_light),
-                        "DARK" to stringResource(R.string.settings_theme_dark)
+                        "DARK" to stringResource(R.string.settings_theme_dark),
+                        "AUTO_TIME" to stringResource(R.string.settings_theme_auto_time),
+                        "AUTO_SUNSET" to stringResource(R.string.settings_theme_auto_sunset)
                     )
                     themes.forEach { (mode, label) ->
                         Row(

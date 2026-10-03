@@ -81,6 +81,12 @@ interface MediaItemDao {
     @Query("UPDATE media_items SET status = :status WHERE id = :id")
     suspend fun updateMediaItemStatus(id: Long, status: String)
 
+    @Query("UPDATE media_items SET status = :status WHERE postId = :postId AND status IN ('PENDING', 'DOWNLOADING', 'PAUSED')")
+    suspend fun updatePendingMediaItemsStatusByPost(postId: String, status: String)
+
+    @Query("SELECT * FROM media_items WHERE status IN ('PENDING', 'DOWNLOADING', 'PAUSED')")
+    fun getActiveQueueItems(): Flow<List<MediaItemEntity>>
+
     @Query("UPDATE media_items SET status = :newStatus WHERE status = :oldStatus")
     suspend fun reconcileOrphanStatus(oldStatus: String, newStatus: String)
 

@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
@@ -761,7 +762,10 @@ fun LibraryScreen(
                                     },
                                     onRetryClick = {
                                         viewModel.retryFailedDownload(postWithMedia)
-                                    }
+                                    },
+                                    onPauseClick = { viewModel.pauseDownload(postWithMedia.post.id) },
+                                    onResumeClick = { viewModel.resumeDownload(postWithMedia.post.id) },
+                                    onCancelClick = { viewModel.cancelDownload(postWithMedia.post.id) }
                                 )
                             }
                         }
@@ -1124,14 +1128,21 @@ private fun ExpressiveLibraryPostItem(
     onClick: () -> Unit,
     onDeleteClick: () -> Unit,
     onShareClick: () -> Unit,
-    onRetryClick: () -> Unit
+    onRetryClick: () -> Unit,
+    onPauseClick: (() -> Unit)? = null,
+    onResumeClick: (() -> Unit)? = null,
+    onCancelClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var menuExpanded by remember { mutableStateOf(false) }
 
     val isDownloading = downloadProgress?.status == MediaStatus.DOWNLOADING ||
             downloadProgress?.status == MediaStatus.PENDING ||
-            postWithMedia.mediaItems.any { it.status == MediaStatus.DOWNLOADING.name || it.status == MediaStatus.PENDING.name }
+            downloadProgress?.status == MediaStatus.PAUSED ||
+            postWithMedia.mediaItems.any { it.status == MediaStatus.DOWNLOADING.name || it.status == MediaStatus.PENDING.name || it.status == MediaStatus.PAUSED.name }
+
+    val isPaused = downloadProgress?.status == MediaStatus.PAUSED ||
+            postWithMedia.mediaItems.any { it.status == MediaStatus.PAUSED.name }
 
     val isFailed = !isDownloading && postWithMedia.mediaItems.any { it.status == "FAILED" || it.status == MediaStatus.FAILED.name }
 
@@ -1448,6 +1459,43 @@ private fun ExpressiveLibraryPostItem(
                                     text = sizeStr,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        // Queue controls (Pause/Resume/Cancel)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isPaused) {
+                                IconButton(
+                                    onClick = { onResumeClick?.invoke() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = stringResource(R.string.queue_action_resume_all),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            } else {
+                                IconButton(
+                                    onClick = { onPauseClick?.invoke() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Pause,
+                                        contentDescription = stringResource(R.string.queue_action_pause_all),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            IconButton(
+                                onClick = { onCancelClick?.invoke() },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.action_cancel),
+                                    tint = MaterialTheme.colorScheme.error
                                 )
                             }
                         }

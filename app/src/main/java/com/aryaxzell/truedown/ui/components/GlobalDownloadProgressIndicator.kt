@@ -133,8 +133,16 @@ fun GlobalDownloadProgressBar(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val statusText = when {
+                                    globalStatus.activeCount > 0 && globalStatus.pausedCount > 0 ->
+                                        stringResource(R.string.queue_subtitle_format, globalStatus.activeCount, globalStatus.pausedCount)
+                                    globalStatus.pausedCount > 0 ->
+                                        "Semua Unduhan Dijeda (${globalStatus.pausedCount})"
+                                    else ->
+                                        stringResource(R.string.a11y_progress_downloading, globalStatus.activeCount)
+                                }
                                 Text(
-                                    text = stringResource(R.string.a11y_progress_downloading, globalStatus.activeCount),
+                                    text = statusText,
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface

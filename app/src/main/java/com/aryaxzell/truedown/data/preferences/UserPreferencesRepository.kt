@@ -7,7 +7,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.emptyPreferences
+import java.io.IOException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "truedown_preferences")
@@ -34,7 +37,15 @@ class UserPreferencesRepository(private val context: Context) {
         val KEY_AUTO_CLEAR_CACHE = booleanPreferencesKey("auto_clear_cache")
     }
 
-    val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { preferences ->
+    val userPreferencesFlow: Flow<UserPreferences> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
         UserPreferences(
             themeMode = preferences[KEY_THEME] ?: "SYSTEM",
             dynamicColor = preferences[KEY_DYNAMIC_COLOR] ?: true,

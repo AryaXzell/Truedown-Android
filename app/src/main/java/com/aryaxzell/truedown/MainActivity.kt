@@ -53,6 +53,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import com.aryaxzell.truedown.ui.components.DownloadQueueBottomSheet
 import com.aryaxzell.truedown.ui.components.GlobalDownloadProgressBar
 import com.aryaxzell.truedown.ui.components.LanguageSwitchSkeletonOverlay
 import com.aryaxzell.truedown.util.rememberReduceMotion
@@ -61,7 +62,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -254,6 +257,7 @@ fun MainAppContent(
     val currentScreen by viewModel.currentScreen.collectAsState()
     val globalDownloadStatus by viewModel.globalDownloadStatus.collectAsState()
     val showBottomBar = (currentScreen is AppScreen.Home || currentScreen is AppScreen.Library) && !isInPipMode
+    var showQueueBottomSheet by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Screen Content Layer with Material 3 Motion Patterns
@@ -439,9 +443,16 @@ fun MainAppContent(
                 .navigationBarsPadding()
                 .padding(bottom = if (showBottomBar) 88.dp else 16.dp),
             onClick = {
-                viewModel.navigateTo(AppScreen.Library)
+                showQueueBottomSheet = true
             }
         )
+
+        if (showQueueBottomSheet) {
+            DownloadQueueBottomSheet(
+                viewModel = viewModel,
+                onDismiss = { showQueueBottomSheet = false }
+            )
+        }
 
         // Floating Pill Navbar & Floating Pill Settings Button Overlay
         AnimatedVisibility(

@@ -14,15 +14,19 @@ import com.aryaxzell.truedown.domain.model.MediaKind
 import com.aryaxzell.truedown.domain.model.MediaStatus
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ResolvedPost
+import com.aryaxzell.truedown.data.local.toResolvedPost
 import com.aryaxzell.truedown.work.DownloadWorker
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class DownloadScheduler(private val context: Context) {
     private val db = TruedownDatabase.getInstance(context)
     private val workManager = WorkManager.getInstance(context)
     private val prefsRepo = UserPreferencesRepository(context)
+    private val cachedPosts = java.util.concurrent.ConcurrentHashMap<String, ResolvedPost>()
 
     suspend fun scheduleDownload(
         post: ResolvedPost,
@@ -31,6 +35,7 @@ class DownloadScheduler(private val context: Context) {
         explicitQuality: String? = null
     ): Result<List<Long>> = withContext(Dispatchers.IO) {
         try {
+            cachedPosts[post.id] = post
             val prefs = prefsRepo.userPreferencesFlow.first()
             val chosenQuality = explicitQuality ?: prefs.defaultQuality
             val isWifiOnly = prefs.wifiOnly
@@ -250,6 +255,71 @@ class DownloadScheduler(private val context: Context) {
     fun cancelDownload(postId: String) {
         workManager.cancelAllWorkByTag("post_$postId")
         com.aryaxzell.truedown.domain.DownloadProgressTracker.clear(postId)
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            db.mediaItemDao().updatePendingMediaItemsStatusByPost(postId, MediaStatus.FAILED.name)
+        }
+    }
+
+    fun pauseDownload(postId: String) {
+        workManager.cancelAllWorkByTag("post_$postId")
+        com.aryaxzell.truedown.domain.DownloadProgressTracker.pause(postId)
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            db.mediaItemDao().updatePendingMediaItemsStatusByPost(postId, MediaStatus.PAUSED.name)
+        }
+    }
+
+    fun resumeDownload(postId: String) {
+        val cached = cachedPosts[postId]
+        com.aryaxzell.truedown.domain.DownloadProgressTracker.resume(postId)
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val pwm = db.postDao().getPostWithMediaById(postId)
+            if (pwm != null) {
+                val post = cached ?: pwm.toResolvedPost()
+                val prefs = prefsRepo.userPreferencesFlow.first()
+                for (item in pwm.mediaItems) {
+                    if (item.status == MediaStatus.PAUSED.name || item.status == MediaStatus.PENDING.name || item.status == MediaStatus.DOWNLOADING.name) {
+                        db.mediaItemDao().updateMediaItemStatus(item.id, MediaStatus.PENDING.name)
+                        val kind = MediaKind.valueOf(item.kind)
+                        val url = when (kind) {
+                            MediaKind.VIDEO -> if (item.quality == "HD" && !post.videoHdUrl.isNullOrBlank()) post.videoHdUrl else (post.videoStandardUrl ?: post.videoHdUrl ?: "")
+                            MediaKind.AUDIO -> post.audioUrl ?: ""
+                            MediaKind.PHOTO -> post.photoUrls.getOrNull(item.itemIndex) ?: ""
+                        }
+                        if (url.isNotBlank()) {
+                            enqueueWorker(
+                                mediaItemId = item.id,
+                                post = post,
+                                mediaUrl = url,
+                                kind = kind,
+                                index = item.itemIndex,
+                                quality = item.quality,
+                                isWifiOnly = prefs.wifiOnly
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun pauseAll() {
+        val currentMap = com.aryaxzell.truedown.domain.DownloadProgressTracker.downloadProgressMap.value
+        val activeIds = currentMap.filter {
+            it.value.status == MediaStatus.DOWNLOADING || it.value.status == MediaStatus.PENDING
+        }.keys
+        for (postId in activeIds) {
+            pauseDownload(postId)
+        }
+    }
+
+    fun resumeAll() {
+        val currentMap = com.aryaxzell.truedown.domain.DownloadProgressTracker.downloadProgressMap.value
+        val pausedIds = currentMap.filter {
+            it.value.status == MediaStatus.PAUSED
+        }.keys
+        for (postId in pausedIds) {
+            resumeDownload(postId)
+        }
     }
 
     suspend fun deletePost(postId: String, deleteFromGallery: Boolean): Boolean = withContext(Dispatchers.IO) {

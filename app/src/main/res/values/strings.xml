@@ -139,6 +139,21 @@
     <string name="settings_theme_system">Ikuti sistem</string>
     <string name="settings_theme_light">Mode terang</string>
     <string name="settings_theme_dark">Mode gelap</string>
+    <string name="settings_theme_auto_time">Otomatis: Waktu Sistem (18:00 - 06:00)</string>
+    <string name="settings_theme_auto_sunset">Otomatis: Terbit &amp; Terbenam Matahari</string>
+    <string name="settings_theme_status_dark">Aktif: Mode Gelap</string>
+    <string name="settings_theme_status_light">Aktif: Mode Terang</string>
+
+    <string name="queue_title">Antrean Unduhan</string>
+    <string name="queue_empty_title">Tidak Ada Unduhan Aktif</string>
+    <string name="queue_empty_subtitle">Unduhan video atau audio yang sedang berjalan akan muncul di sini secara real-time.</string>
+    <string name="queue_action_pause_all">Jeda Semua</string>
+    <string name="queue_action_resume_all">Lanjutkan Semua</string>
+    <string name="queue_action_cancel_all">Batalkan Semua</string>
+    <string name="queue_status_downloading">Mengunduh… %1$d%%</string>
+    <string name="queue_status_pending">Menunggu antrean…</string>
+    <string name="queue_status_paused">Dijeda</string>
+    <string name="queue_subtitle_format">%1$d aktif • %2$d dijeda</string>
     <string name="settings_dynamic_color_label">Warna dinamis</string>
     <string name="settings_dynamic_color_desc">Menyesuaikan palet warna dengan wallpaper sistem</string>
     <string name="settings_dynamic_color_unsupported">Fitur warna dinamis butuh Android 12 ke atas</string>

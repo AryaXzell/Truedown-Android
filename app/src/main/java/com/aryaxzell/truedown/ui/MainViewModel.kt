@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 data class GlobalDownloadStatus(
     val hasActiveDownloads: Boolean = false,
     val activeCount: Int = 0,
+    val pausedCount: Int = 0,
     val progressPercent: Int = 0,
     val isIndeterminate: Boolean = true,
     val latestTitle: String = ""
@@ -115,21 +116,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val activeProgresses = progressMap.values.filter {
             it.status == MediaStatus.DOWNLOADING || it.status == MediaStatus.PENDING
         }
+        val pausedProgresses = progressMap.values.filter {
+            it.status == MediaStatus.PAUSED
+        }
 
-        val isActive = activeWorkInfos.isNotEmpty() || activeProgresses.isNotEmpty()
-        val count = maxOf(activeWorkInfos.size, activeProgresses.size)
+        val activeCount = maxOf(activeWorkInfos.size, activeProgresses.size)
+        val pausedCount = pausedProgresses.size
+        val hasActive = activeCount > 0 || pausedCount > 0
 
-        if (!isActive) {
+        if (!hasActive) {
             GlobalDownloadStatus()
         } else {
             val validPercents = activeProgresses.map { it.progressPercent }.filter { it > 0 }
             val avgPercent = if (validPercents.isNotEmpty()) validPercents.average().toInt() else 0
-            val latestTitle = activeProgresses.lastOrNull()?.title ?: ""
-            val isIndeterminate = avgPercent <= 0
+            val latestTitle = (activeProgresses + pausedProgresses).lastOrNull()?.title ?: ""
+            val isIndeterminate = avgPercent <= 0 && activeCount > 0
 
             GlobalDownloadStatus(
                 hasActiveDownloads = true,
-                activeCount = count,
+                activeCount = activeCount,
+                pausedCount = pausedCount,
                 progressPercent = avgPercent,
                 isIndeterminate = isIndeterminate,
                 latestTitle = latestTitle
@@ -396,6 +402,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cancelDownload(postId: String) {
         downloadScheduler.cancelDownload(postId)
+    }
+
+    fun pauseDownload(postId: String) {
+        downloadScheduler.pauseDownload(postId)
+    }
+
+    fun resumeDownload(postId: String) {
+        downloadScheduler.resumeDownload(postId)
+    }
+
+    fun pauseAllDownloads() {
+        downloadScheduler.pauseAll()
+    }
+
+    fun resumeAllDownloads() {
+        downloadScheduler.resumeAll()
     }
 
     fun deletePost(postWithMedia: PostWithMedia, deleteFromGallery: Boolean, onResult: ((DeleteResult) -> Unit)? = null) {

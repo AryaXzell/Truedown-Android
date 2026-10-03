@@ -14,6 +14,7 @@ enum class MediaKind {
 enum class MediaStatus {
     PENDING,
     DOWNLOADING,
+    PAUSED,
     DONE,
     FAILED,
     MISSING

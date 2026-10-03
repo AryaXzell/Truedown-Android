@@ -115,6 +115,26 @@ object DownloadProgressTracker {
         }
     }
 
+    fun pause(postId: String) {
+        if (postId.isBlank()) return
+        _downloadProgressMap.update { current ->
+            val existing = current[postId]
+            if (existing != null) {
+                current + (postId to existing.copy(status = MediaStatus.PAUSED))
+            } else current
+        }
+    }
+
+    fun resume(postId: String) {
+        if (postId.isBlank()) return
+        _downloadProgressMap.update { current ->
+            val existing = current[postId]
+            if (existing != null) {
+                current + (postId to existing.copy(status = MediaStatus.PENDING))
+            } else current
+        }
+    }
+
     fun clear(postId: String) {
         if (postId.isBlank()) return
         _downloadProgressMap.update { current ->

@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -80,10 +81,15 @@ fun TruedownTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = when (themeMode.uppercase()) {
-        "LIGHT" -> false
-        "DARK" -> true
-        else -> isSystemInDarkTheme()
+    val context = LocalContext.current
+    val systemInDark = isSystemInDarkTheme()
+    val darkTheme = remember(themeMode, systemInDark) {
+        when (themeMode.uppercase()) {
+            "LIGHT" -> false
+            "DARK" -> true
+            "AUTO_TIME", "AUTO_SUNSET" -> com.aryaxzell.truedown.util.AutoThemeHelper.isDarkThemeActive(context, themeMode)
+            else -> systemInDark
+        }
     }
     TruedownTheme(
         darkTheme = darkTheme,

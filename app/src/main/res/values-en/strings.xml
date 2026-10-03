@@ -139,6 +139,21 @@
     <string name="settings_theme_system">Follow system</string>
     <string name="settings_theme_light">Light mode</string>
     <string name="settings_theme_dark">Dark mode</string>
+    <string name="settings_theme_auto_time">Auto: System Time (6 PM - 6 AM)</string>
+    <string name="settings_theme_auto_sunset">Auto: Sunset &amp; Sunrise</string>
+    <string name="settings_theme_status_dark">Active: Dark Mode</string>
+    <string name="settings_theme_status_light">Active: Light Mode</string>
+
+    <string name="queue_title">Download Queue</string>
+    <string name="queue_subtitle_format">%1$d active • %2$d paused</string>
+    <string name="queue_empty_title">No Active Downloads</string>
+    <string name="queue_empty_subtitle">Ongoing video or audio downloads will appear here in real-time.</string>
+    <string name="queue_action_pause_all">Pause All</string>
+    <string name="queue_action_resume_all">Resume All</string>
+    <string name="queue_action_cancel_all">Cancel All</string>
+    <string name="queue_status_downloading">Downloading… %1$d%%</string>
+    <string name="queue_status_pending">Waiting in queue…</string>
+    <string name="queue_status_paused">Paused</string>
     <string name="settings_dynamic_color_label">Dynamic color</string>
     <string name="settings_dynamic_color_desc">Match app color palette with system wallpaper</string>
     <string name="settings_dynamic_color_unsupported">Dynamic color requires Android 12 or above</string>
