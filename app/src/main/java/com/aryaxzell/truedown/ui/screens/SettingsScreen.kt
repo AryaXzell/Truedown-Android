@@ -47,7 +47,11 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -114,6 +118,10 @@ fun SettingsScreen(
     var showDohDialog by remember { mutableStateOf(false) }
     var showDeveloperLogsDialog by remember { mutableStateOf(false) }
     var showStorageCleanerModal by remember { mutableStateOf(false) }
+    var showUpdateHistoryDialog by remember { mutableStateOf(false) }
+
+    val db = remember { com.aryaxzell.truedown.data.local.TruedownDatabase.getInstance(context) }
+    val updateHistoryList by db.updateHistoryDao().getAllHistory().collectAsState(initial = emptyList())
 
     val safFolderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -516,6 +524,19 @@ fun SettingsScreen(
                     testTag = "settings_doh_row",
                     iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     iconTint = MaterialTheme.colorScheme.tertiary
+                )
+            }
+
+            // Card: Pembaruan & Riwayat
+            SettingsGroupCard(title = "Pembaruan & Riwayat") {
+                SettingsClickableRow(
+                    icon = Icons.Default.History,
+                    title = "Riwayat Pembaruan Aplikasi",
+                    subtitle = "Lihat status keberhasilan pembaruan sebelumnya",
+                    onClick = { showUpdateHistoryDialog = true },
+                    testTag = "settings_update_history_row",
+                    iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    iconTint = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -1043,6 +1064,160 @@ fun SettingsScreen(
             autoClearOnExit = preferences.autoClearCacheOnExit,
             onToggleAutoClear = { enabled -> viewModel.updateAutoClearCacheOnExit(enabled) },
             onDismiss = { showStorageCleanerModal = false }
+        )
+    }
+
+    // Update History Dialog
+    if (showUpdateHistoryDialog) {
+        val sdf = remember { java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale.getDefault()) }
+        AlertDialog(
+            onDismissRequest = { showUpdateHistoryDialog = false },
+            shape = RoundedCornerShape(26.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Riwayat Pembaruan",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    if (updateHistoryList.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    db.updateHistoryDao().clearHistory()
+                                }
+                            }
+                        ) {
+                            Text("Bersihkan", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                ) {
+                    if (updateHistoryList.isEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Belum ada riwayat pembaruan",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.outline,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(updateHistoryList) { history ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                    ),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = history.versionName,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = "${history.updateType} • ${sdf.format(java.util.Date(history.timestamp))}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.outline
+                                                )
+                                            }
+
+                                            // Status Badge
+                                            val badgeBg = when (history.status) {
+                                                "Success" -> MaterialTheme.colorScheme.primaryContainer
+                                                "Failed" -> MaterialTheme.colorScheme.errorContainer
+                                                else -> MaterialTheme.colorScheme.surfaceVariant
+                                            }
+                                            val badgeText = when (history.status) {
+                                                "Success" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                "Failed" -> MaterialTheme.colorScheme.onErrorContainer
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = badgeBg
+                                            ) {
+                                                Text(
+                                                    text = when (history.status) {
+                                                        "Success" -> "Selesai"
+                                                        "Failed" -> "Gagal"
+                                                        else -> history.status
+                                                    },
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = badgeText,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+
+                                        if (!history.errorMessage.isNullOrBlank()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = "Error: ${history.errorMessage}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showUpdateHistoryDialog = false },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Tutup", fontWeight = FontWeight.Bold)
+                }
+            }
         )
     }
 }

@@ -148,169 +148,171 @@ fun PreviewScreen(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Hero Media Showcase Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(350.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                tonalElevation = 3.dp,
-                shadowElevation = 2.dp,
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                )
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+            if (post.type != PostType.VIDEO) {
+                // Hero Media Showcase Card
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(350.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 2.dp,
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                    )
                 ) {
-                    val imageUrl = post.coverUrl?.ifBlank { null }
-                        ?: post.photoUrls.firstOrNull()
-                        ?: ""
-
-                    SubcomposeAsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(imageUrl)
-                            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
-                            .addHeader("Referer", "https://www.tiktok.com/")
-                            .apply {
-                                if (isBatterySaver) {
-                                    size(240, 240)
-                                    allowHardware(false)
-                                    crossfade(false)
-                                } else {
-                                    crossfade(true)
-                                }
-                            }
-                            .build(),
-                        contentDescription = post.title,
+                    Box(
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentAlignment = Alignment.Center
                     ) {
-                        val state = painter.state
-                        if (state is AsyncImagePainter.State.Loading) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .shimmerEffect()
-                            )
-                        } else if (state is AsyncImagePainter.State.Error || imageUrl.isBlank()) {
-                            // Custom empty state illustration fallback instead of blank black screen
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.radialGradient(
-                                            colors = listOf(
-                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-                                                MaterialTheme.colorScheme.surfaceContainerHigh
-                                            )
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.padding(24.dp)
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.ic_anime_empty_state),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(110.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = if (post.type == PostType.VIDEO) "Preview Video TikTok" else "Slideshow Foto TikTok",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "@${post.authorHandle.ifBlank { post.authorName }}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                        val imageUrl = post.coverUrl?.ifBlank { null }
+                            ?: post.photoUrls.firstOrNull()
+                            ?: ""
+
+                        SubcomposeAsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(imageUrl)
+                                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                                .addHeader("Referer", "https://www.tiktok.com/")
+                                .apply {
+                                    if (isBatterySaver) {
+                                        size(240, 240)
+                                        allowHardware(false)
+                                        crossfade(false)
+                                    } else {
+                                        crossfade(true)
+                                    }
                                 }
-                            }
-                        } else {
-                            SubcomposeAsyncImageContent()
-                            // Gradient Vignette for strong contrast
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color.Black.copy(alpha = 0.35f),
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.65f)
+                                .build(),
+                            contentDescription = post.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        ) {
+                            val state = painter.state
+                            if (state is AsyncImagePainter.State.Loading) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .shimmerEffect()
+                                )
+                            } else if (state is AsyncImagePainter.State.Error || imageUrl.isBlank()) {
+                                // Custom empty state illustration fallback instead of blank black screen
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.radialGradient(
+                                                colors = listOf(
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                                )
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.padding(24.dp)
+                                    ) {
+                                        Image(
+                                            painter = painterResource(id = R.drawable.ic_anime_empty_state),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(110.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            text = if (post.type == PostType.VIDEO) "Preview Video TikTok" else "Slideshow Foto TikTok",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "@${post.authorHandle.ifBlank { post.authorName }}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else {
+                                SubcomposeAsyncImageContent()
+                                // Gradient Vignette for strong contrast
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Black.copy(alpha = 0.35f),
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = 0.65f)
+                                                )
                                             )
                                         )
-                                    )
-                            )
+                                )
+                            }
                         }
-                    }
 
-                    // Media Type Badge (Top-Left)
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = Color.Black.copy(alpha = 0.65f),
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (post.type == PostType.VIDEO) Icons.Default.Movie else Icons.Default.PhotoLibrary,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (post.type == PostType.VIDEO) {
-                                    if (!post.videoHdUrl.isNullOrBlank()) "HD Video" else "Video MP4"
-                                } else {
-                                    "Slideshow (${post.photoUrls.size} Foto)"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    // Duration Badge if Video (Bottom-Right)
-                    if (post.type == PostType.VIDEO && post.durationSec > 0) {
+                        // Media Type Badge (Top-Left)
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color.Black.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(14.dp),
+                            color = Color.Black.copy(alpha = 0.65f),
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
+                                .align(Alignment.TopStart)
                                 .padding(16.dp)
                         ) {
-                            val mins = post.durationSec / 60
-                            val secs = post.durationSec % 60
-                            Text(
-                                text = String.format("%02d:%02d", mins, secs),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (post.type == PostType.VIDEO) Icons.Default.Movie else Icons.Default.PhotoLibrary,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (post.type == PostType.VIDEO) {
+                                        if (!post.videoHdUrl.isNullOrBlank()) "HD Video" else "Video MP4"
+                                    } else {
+                                        "Slideshow (${post.photoUrls.size} Foto)"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+                        }
+
+                        // Duration Badge if Video (Bottom-Right)
+                        if (post.type == PostType.VIDEO && post.durationSec > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = Color.Black.copy(alpha = 0.7f),
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(16.dp)
+                            ) {
+                                val mins = post.durationSec / 60
+                                val secs = post.durationSec % 60
+                                Text(
+                                    text = String.format("%02d:%02d", mins, secs),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(18.dp))
+            }
 
             // Quick Media Preview Card (Inline Player / Slideshow / Audio Preview)
             QuickMediaPreviewCard(post = post)

@@ -6,13 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [PostEntity::class, MediaItemEntity::class],
-    version = 2,
+    entities = [PostEntity::class, MediaItemEntity::class, UpdateHistoryEntity::class],
+    version = 3,
     exportSchema = true
 )
 abstract class TruedownDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
     abstract fun mediaItemDao(): MediaItemDao
+    abstract fun updateHistoryDao(): UpdateHistoryDao
 
     companion object {
         @Volatile

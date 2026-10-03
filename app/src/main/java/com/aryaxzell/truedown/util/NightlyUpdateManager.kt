@@ -183,23 +183,29 @@ object NightlyUpdateManager {
                 _updateState.value = NightlyUpdateState.Downloading(0f, 0L, 0L)
                 AppLogger.i("NightlyUpdate", "Mengunduh artefak ZIP dari: $NIGHTLY_URL")
 
-                val request = Request.Builder()
-                    .url(NIGHTLY_URL)
-                    .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) Truedown-Android-App")
-                    .build()
-
-                val response = client.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    val err = "Gagal mengunduh artefak Nightly (HTTP ${response.code}). Server sedang sibuk."
-                    _updateState.value = NightlyUpdateState.Error(err)
-                    AppLogger.e("NightlyUpdate", err)
-                    return@withContext
+                val response = UpdateHistoryLogger.runWithExponentialBackoff(
+                    maxRetries = 3,
+                    initialDelayMs = 1500L,
+                    onRetry = { attempt, delayMs, ex ->
+                        AppLogger.w("NightlyUpdate", "Koneksi terputus (Upaya $attempt/3). Mencoba kembali dalam ${delayMs}ms...: ${ex.localizedMessage}")
+                    }
+                ) {
+                    val req = Request.Builder()
+                        .url(NIGHTLY_URL)
+                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) Truedown-Android-App")
+                        .build()
+                    val resp = client.newCall(req).execute()
+                    if (!resp.isSuccessful) {
+                        throw Exception("Gagal mengunduh artefak Nightly (HTTP ${resp.code})")
+                    }
+                    resp
                 }
 
                 val body = response.body
                 if (body == null) {
                     val err = "Respon server kosong saat mengunduh artefak"
                     _updateState.value = NightlyUpdateState.Error(err)
+                    UpdateHistoryLogger.logAttempt(context, "Nightly", "Nightly", "Failed", err)
                     return@withContext
                 }
 
@@ -208,6 +214,7 @@ object NightlyUpdateManager {
                     val err = "Artefak Nightly di GitHub belum tersedia atau link telah expired. Silakan coba beberapa saat lagi."
                     _updateState.value = NightlyUpdateState.Error(err)
                     AppLogger.e("NightlyUpdate", "Response berupa HTML, bukan berkas ZIP: $contentType")
+                    UpdateHistoryLogger.logAttempt(context, "Nightly", "Nightly", "Failed", err)
                     return@withContext
                 }
 
@@ -346,6 +353,7 @@ object NightlyUpdateManager {
                 extractedApk = finalApkFile
                 AppLogger.i("NightlyUpdate", "Pilihan APK Optimal (${bestCandidate.entryName}) untuk $deviceAbi berhasil disiapkan: ${extractedApk.length()} bytes")
                 _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
+                UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
 
                 // 4. Jalankan Instalasi APK In-App
                 withContext(Dispatchers.Main) {
@@ -354,7 +362,9 @@ object NightlyUpdateManager {
 
             } catch (e: Exception) {
                 AppLogger.e("NightlyUpdate", "Kendala saat proses unduh/ekstrak Nightly", e)
-                _updateState.value = NightlyUpdateState.Error(e.localizedMessage ?: "Terjadi kendala tidak dikenal")
+                val errMsg = e.localizedMessage ?: "Terjadi kendala tidak dikenal"
+                _updateState.value = NightlyUpdateState.Error(errMsg)
+                UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Failed", errMsg)
             } finally {
                 if (zipFile.exists()) {
                     zipFile.delete()

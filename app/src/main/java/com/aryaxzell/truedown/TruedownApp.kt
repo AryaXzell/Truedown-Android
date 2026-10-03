@@ -16,6 +16,10 @@ class TruedownApp : Application(), ImageLoaderFactory {
 
     override fun newImageLoader(): ImageLoader {
         val okHttpClient = OkHttpClient.Builder()
+            .cache(okhttp3.Cache(
+                directory = cacheDir.resolve("okhttp_cache"),
+                maxSize = 128L * 1024L * 1024L // 128MB Disk Cache
+            ))
             .addInterceptor { chain ->
                 val original = chain.request()
                 val requestBuilder = original.newBuilder()
@@ -33,6 +37,15 @@ class TruedownApp : Application(), ImageLoaderFactory {
 
                 chain.proceed(requestBuilder.build())
             }
+            .addNetworkInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                // Force rewrite cache headers to allow local offline cache for 30 days
+                response.newBuilder()
+                    .header("Cache-Control", "public, max-age=2592000") // 30 days
+                    .removeHeader("Pragma")
+                    .removeHeader("Expires")
+                    .build()
+            }
             .build()
 
         return ImageLoader.Builder(this)
@@ -43,14 +56,14 @@ class TruedownApp : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    // Strict limit: 15% of max RAM memory
-                    .maxSizePercent(0.15)
+                    // Strict limit: 25% of max RAM memory (increased from 15%)
+                    .maxSizePercent(0.25)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(40L * 1024L * 1024L) // 40MB max disk cache
+                    .maxSizeBytes(128L * 1024L * 1024L) // 128MB max disk cache (increased from 40MB)
                     .build()
             }
             .allowRgb565(true) // 50% memory saving per bitmap
