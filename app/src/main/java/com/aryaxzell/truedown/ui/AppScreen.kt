@@ -13,4 +13,5 @@ sealed class AppScreen {
     data class VideoPlayer(val postWithMedia: PostWithMedia) : AppScreen()
     data class AudioPlayer(val postWithMedia: PostWithMedia) : AppScreen()
     object Settings : AppScreen()
+    object About : AppScreen()
 }

@@ -72,6 +72,7 @@ import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ProviderError
 import com.aryaxzell.truedown.ui.AppScreen
 import com.aryaxzell.truedown.ui.MainViewModel
+import com.aryaxzell.truedown.ui.screens.AboutScreen
 import com.aryaxzell.truedown.ui.screens.BuiltInAudioPlayerScreen
 import com.aryaxzell.truedown.ui.screens.BuiltInVideoPlayerScreen
 import com.aryaxzell.truedown.ui.screens.HomeScreen
@@ -221,7 +222,7 @@ fun MainAppContent(
                             slideOutHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } +
                                     fadeOut(animationSpec = tween(150, easing = FastOutSlowInEasing))
                         )
-                } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings) {
+                } else if (targetState is AppScreen.Preview || targetState is AppScreen.VideoPlayer || targetState is AppScreen.AudioPlayer || targetState is AppScreen.SlideshowGrid || targetState is AppScreen.Settings || targetState is AppScreen.About) {
                     // Container Transform Scale & Fade expansion into detail / preview / players
                     (scaleIn(initialScale = 0.90f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)) +
                             fadeIn(animationSpec = enterSpec))
@@ -345,6 +346,11 @@ fun MainAppContent(
                 is AppScreen.Settings -> {
                     SettingsScreen(
                         viewModel = viewModel,
+                        onBack = { viewModel.popBackStack() }
+                    )
+                }
+                is AppScreen.About -> {
+                    AboutScreen(
                         onBack = { viewModel.popBackStack() }
                     )
                 }

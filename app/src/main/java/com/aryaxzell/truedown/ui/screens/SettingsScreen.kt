@@ -498,29 +498,11 @@ fun SettingsScreen(
                 SettingsClickableRow(
                     icon = Icons.Default.Info,
                     title = "Truedown Android",
-                    subtitle = stringResource(R.string.settings_app_version_format, com.aryaxzell.truedown.BuildConfig.VERSION_NAME),
-                    onClick = {},
+                    subtitle = stringResource(R.string.settings_app_version_format, com.aryaxzell.truedown.BuildConfig.VERSION_NAME) + " • Informasi & Pengembang",
+                    onClick = { viewModel.navigateTo(com.aryaxzell.truedown.ui.AppScreen.About) },
                     testTag = "settings_version_row",
                     iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     iconTint = MaterialTheme.colorScheme.primary
-                )
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                )
-
-                SettingsClickableRow(
-                    icon = Icons.AutoMirrored.Filled.OpenInNew,
-                    title = stringResource(R.string.settings_check_update_title),
-                    subtitle = "Buka halaman GitHub Releases",
-                    onClick = {
-                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aryaxzell/truedown-android/releases"))
-                        context.startActivity(browserIntent)
-                    },
-                    testTag = "settings_update_row",
-                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    iconTint = MaterialTheme.colorScheme.secondary
                 )
 
                 HorizontalDivider(

@@ -28,23 +28,23 @@ object AppLogger {
 
     fun d(tag: String, message: String) {
         add("DEBUG", tag, message)
-        Log.d(tag, message)
+        try { Log.d(tag, message) } catch (_: Throwable) {}
     }
 
     fun i(tag: String, message: String) {
         add("INFO", tag, message)
-        Log.i(tag, message)
+        try { Log.i(tag, message) } catch (_: Throwable) {}
     }
 
     fun w(tag: String, message: String) {
         add("WARN", tag, message)
-        Log.w(tag, message)
+        try { Log.w(tag, message) } catch (_: Throwable) {}
     }
 
     fun e(tag: String, message: String, throwable: Throwable? = null) {
         val fullMsg = if (throwable != null) "$message\n${throwable.stackTraceToString()}" else message
         add("ERROR", tag, fullMsg)
-        Log.e(tag, message, throwable)
+        try { Log.e(tag, message, throwable) } catch (_: Throwable) {}
     }
 
     private fun add(level: String, tag: String, message: String) {
