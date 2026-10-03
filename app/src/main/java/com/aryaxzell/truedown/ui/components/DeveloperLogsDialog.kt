@@ -6,6 +6,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,8 @@ fun DeveloperLogsDialog(
     val context = LocalContext.current
     val logs by AppLogger.logs.collectAsState()
     var selectedLevelFilter by remember { mutableStateOf("ALL") }
+    var crashFiles by remember { mutableStateOf(com.aryaxzell.truedown.util.CrashHandler.getLogFiles(context)) }
+    var selectedCrashFileContent by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val filteredLogs = remember(logs, selectedLevelFilter) {
         if (selectedLevelFilter == "ALL") logs
@@ -142,12 +145,17 @@ fun DeveloperLogsDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val filterOptions = listOf("ALL", "DEBUG", "INFO", "WARN", "ERROR")
+                    val filterOptions = listOf("ALL", "DEBUG", "INFO", "WARN", "ERROR", "CRASH_LOGS")
                     filterOptions.forEach { level ->
                         FilterChip(
                             selected = selectedLevelFilter == level,
-                            onClick = { selectedLevelFilter = level },
-                            label = { Text(level, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                            onClick = {
+                                selectedLevelFilter = level
+                                if (level == "CRASH_LOGS") {
+                                    crashFiles = com.aryaxzell.truedown.util.CrashHandler.getLogFiles(context)
+                                }
+                            },
+                            label = { Text(if (level == "CRASH_LOGS") "💥 CRASH LOGS (${crashFiles.size})" else level, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                         )
                     }
                 }
@@ -161,16 +169,22 @@ fun DeveloperLogsDialog(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            val formattedText = AppLogger.getFormattedLogText()
+                            val textToCopy = if (selectedLevelFilter == "CRASH_LOGS") {
+                                crashFiles.joinToString("\n\n--------------------\n\n") { file ->
+                                    "[${file.name}]\n" + (try { file.readText() } catch (_: Exception) { "" })
+                                }
+                            } else {
+                                AppLogger.getFormattedLogText()
+                            }
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            val clip = ClipData.newPlainText("Truedown App Logs", formattedText)
+                            val clip = ClipData.newPlainText("Truedown Logs", textToCopy)
                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                                 clip.description.extras = android.os.PersistableBundle().apply {
                                     putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
                                 }
                             }
                             clipboard?.setPrimaryClip(clip)
-                            Toast.makeText(context, "Log berhasil disalin ke clipboard", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Log disalin ke clipboard", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
@@ -182,8 +196,14 @@ fun DeveloperLogsDialog(
 
                     OutlinedButton(
                         onClick = {
-                            AppLogger.clear()
-                            Toast.makeText(context, "Log dibersihkan", Toast.LENGTH_SHORT).show()
+                            if (selectedLevelFilter == "CRASH_LOGS") {
+                                com.aryaxzell.truedown.util.CrashHandler.clearAllLogs(context)
+                                crashFiles = emptyList()
+                                Toast.makeText(context, "Berkas crash log dibersihkan", Toast.LENGTH_SHORT).show()
+                            } else {
+                                AppLogger.clear()
+                                Toast.makeText(context, "Log dibersihkan", Toast.LENGTH_SHORT).show()
+                            }
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp)
@@ -196,8 +216,86 @@ fun DeveloperLogsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Logs List
-                if (filteredLogs.isEmpty()) {
+                // Logs List / Crash Files List
+                if (selectedLevelFilter == "CRASH_LOGS") {
+                    if (crashFiles.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerLow,
+                                    shape = RoundedCornerShape(16.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Belum ada berkas crash log tersimpan.\nSemua berjalan stabil! 🎉",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceContainerLowest,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(crashFiles, key = { it.absolutePath }) { file ->
+                                val fileSizeKb = file.length() / 1024
+                                val lastMod = remember(file) {
+                                    java.text.SimpleDateFormat("dd MMM yyyy HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(file.lastModified()))
+                                }
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)),
+                                    onClick = {
+                                        try {
+                                            selectedCrashFileContent = Pair(file.name, file.readText())
+                                        } catch (_: Exception) {}
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = file.name,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                            Text(
+                                                text = "$lastMod • ${fileSizeKb} KB",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        TextButton(onClick = {
+                                            try {
+                                                selectedCrashFileContent = Pair(file.name, file.readText())
+                                            } catch (_: Exception) {}
+                                        }) {
+                                            Text("Lihat", fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (filteredLogs.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -242,6 +340,56 @@ fun DeveloperLogsDialog(
                 }
             }
         }
+    }
+
+    selectedCrashFileContent?.let { (fileName, fileContent) ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { selectedCrashFileContent = null },
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Text(
+                    text = fileName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(320.dp)
+                        .background(
+                            MaterialTheme.colorScheme.surfaceContainerLowest,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(10.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = fileContent,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    val clip = ClipData.newPlainText("Crash Log", fileContent)
+                    clipboard?.setPrimaryClip(clip)
+                    Toast.makeText(context, "Laporan crash disalin", Toast.LENGTH_SHORT).show()
+                }) {
+                    Text("Salin Report", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedCrashFileContent = null }) {
+                    Text("Tutup")
+                }
+            }
+        )
     }
 }
 

@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.semantics
@@ -109,6 +110,101 @@ fun SettingsScreen(
     viewModel: MainViewModel,
     onBack: () -> Unit
 ) {
+    var hasError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    if (hasError) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = stringResource(R.string.settings_title),
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.BugReport,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Gagal Membuka Pengaturan",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (errorMessage.isNotBlank()) errorMessage else "Sistem mengalami kendala sementara saat memuat pengaturan pada perangkat ini.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onBack,
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Kembali ke Beranda", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    } else {
+        SettingsScreenContent(
+            viewModel = viewModel,
+            onBack = onBack,
+            onError = { ex ->
+                com.aryaxzell.truedown.util.CrashHandler.writeCrashLog(context, Thread.currentThread(), ex)
+                com.aryaxzell.truedown.util.AppLogger.e("SettingsScreen", "Handled UI exception in SettingsScreen", ex)
+                hasError = true
+                errorMessage = ex.localizedMessage ?: "Terjadi kesalahan sistem"
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsScreenContent(
+    viewModel: MainViewModel,
+    onBack: () -> Unit,
+    onError: (Throwable) -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -126,10 +222,6 @@ fun SettingsScreen(
     var showDeveloperLogsDialog by remember { mutableStateOf(false) }
     var showStorageCleanerModal by remember { mutableStateOf(false) }
     var showUpdateHistoryDialog by remember { mutableStateOf(false) }
-
-    val db = remember { com.aryaxzell.truedown.data.local.TruedownDatabase.getInstance(context) }
-    val updateHistoryFlow = remember(db) { db.updateHistoryDao().getAllHistory() }
-    val updateHistoryList by updateHistoryFlow.collectAsState(initial = emptyList())
 
     val safFolderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -1139,6 +1231,9 @@ fun SettingsScreen(
 
     // Update History Dialog
     if (showUpdateHistoryDialog) {
+        val db = remember { com.aryaxzell.truedown.data.local.TruedownDatabase.getInstance(context) }
+        val updateHistoryFlow = remember(db) { db.updateHistoryDao().getAllHistory() }
+        val updateHistoryList by updateHistoryFlow.collectAsState(initial = emptyList())
         val sdf = remember { java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", java.util.Locale.getDefault()) }
         AlertDialog(
             onDismissRequest = { showUpdateHistoryDialog = false },

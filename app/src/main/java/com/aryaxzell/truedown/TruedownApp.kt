@@ -12,6 +12,7 @@ class TruedownApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        com.aryaxzell.truedown.util.CrashHandler.init(this)
     }
 
     override fun newImageLoader(): ImageLoader {
