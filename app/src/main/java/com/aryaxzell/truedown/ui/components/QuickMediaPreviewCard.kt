@@ -59,7 +59,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
@@ -67,6 +69,7 @@ import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.domain.model.PostType
 import com.aryaxzell.truedown.domain.model.ResolvedPost
 
+@OptIn(UnstableApi::class)
 @Composable
 fun QuickMediaPreviewCard(
     post: ResolvedPost,
@@ -116,6 +119,7 @@ fun QuickMediaPreviewCard(
     }
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 private fun VideoPreviewSection(
     videoUrl: String,
