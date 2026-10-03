@@ -96,7 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val allPosts: StateFlow<List<PostWithMedia>> = database.postDao().getAllPostsWithMedia()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val downloadProgress: StateFlow<Map<String, DownloadProgress>> = DownloadProgressTracker.downloadProgressMap
 

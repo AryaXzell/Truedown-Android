@@ -46,11 +46,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Background RAM Monitor Service -->
-        <service
-            android:name=".service.RamMonitorService"
-            android:exported="false" />
-
         <!-- Foreground Service for background downloads via WorkManager (PRD 6.4) -->
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

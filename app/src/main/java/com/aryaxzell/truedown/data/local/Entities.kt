@@ -7,7 +7,10 @@ import androidx.room.PrimaryKey
 import androidx.room.Embedded
 import androidx.room.Relation
 
-@Entity(tableName = "posts")
+@Entity(
+    tableName = "posts",
+    indices = [Index(value = ["createdAt"])]
+)
 data class PostEntity(
     @PrimaryKey
     val id: String,

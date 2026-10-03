@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
+import java.util.ArrayDeque
 import java.util.Date
 import java.util.Locale
 
@@ -23,6 +24,7 @@ object AppLogger {
     private val dateFormat = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     private var counter = 0L
     private const val MAX_LOGS = 500
+    private val buffer = ArrayDeque<LogEntry>(MAX_LOGS)
 
     fun d(tag: String, message: String) {
         add("DEBUG", tag, message)
@@ -48,16 +50,20 @@ object AppLogger {
     private fun add(level: String, tag: String, message: String) {
         val time = dateFormat.format(Date())
         val entry = LogEntry(++counter, time, level, tag, message)
-        val current = _logs.value.toMutableList()
-        if (current.size >= MAX_LOGS) {
-            current.removeAt(0)
+        synchronized(buffer) {
+            if (buffer.size >= MAX_LOGS) {
+                buffer.removeFirst()
+            }
+            buffer.addLast(entry)
+            _logs.value = buffer.toList()
         }
-        current.add(entry)
-        _logs.value = current
     }
 
     fun clear() {
-        _logs.value = emptyList()
+        synchronized(buffer) {
+            buffer.clear()
+            _logs.value = emptyList()
+        }
     }
 
     fun getFormattedLogText(): String {

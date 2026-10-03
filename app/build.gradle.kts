@@ -20,7 +20,7 @@ val hasReleaseSigning = releaseKeystorePath.isNotBlank() &&
         file(releaseKeystorePath).exists()
 
 val appVersionMajor = 1
-val appVersionMinor = 0
+val appVersionMinor = 1
 val appVersionPatch = 0
 val baseVersionCode = appVersionMajor * 10000 + appVersionMinor * 100 + appVersionPatch
 val appVersionName = "$appVersionMajor.$appVersionMinor.$appVersionPatch"
@@ -148,6 +148,10 @@ secrets {
     ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
 
@@ -175,7 +179,6 @@ dependencies {
     implementation(libs.converter.moshi)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.logging.interceptor)
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp)
     implementation(libs.retrofit)

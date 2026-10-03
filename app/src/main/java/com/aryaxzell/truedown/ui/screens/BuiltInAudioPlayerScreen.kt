@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +78,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.aryaxzell.truedown.R
 import com.aryaxzell.truedown.data.local.PostWithMedia
 import com.aryaxzell.truedown.domain.model.MediaKind
+import com.aryaxzell.truedown.util.AppLogger
+import com.aryaxzell.truedown.util.VideoMemoryManager
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -203,8 +206,20 @@ fun BuiltInAudioPlayerScreen(
         }
     }
 
-    DisposableEffect(Unit) {
+    val scope = rememberCoroutineScope()
+
+    DisposableEffect(exoPlayer) {
+        val trimListener = {
+            try {
+                AppLogger.w("AudioPlayer", "RAM limit reached (>180MB). Trimming audio buffers.")
+            } catch (_: Exception) {}
+        }
+        VideoMemoryManager.registerTrimListener(trimListener)
+        VideoMemoryManager.startMonitoring(context.applicationContext, scope)
+
         onDispose {
+            VideoMemoryManager.unregisterTrimListener(trimListener)
+            VideoMemoryManager.stopMonitoring()
             exoPlayer.stop()
             exoPlayer.release()
         }

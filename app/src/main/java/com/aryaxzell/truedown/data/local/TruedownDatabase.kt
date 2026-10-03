@@ -7,8 +7,8 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [PostEntity::class, MediaItemEntity::class],
-    version = 1,
-    exportSchema = false
+    version = 2,
+    exportSchema = true
 )
 abstract class TruedownDatabase : RoomDatabase() {
     abstract fun postDao(): PostDao
@@ -24,7 +24,10 @@ abstract class TruedownDatabase : RoomDatabase() {
                     context.applicationContext,
                     TruedownDatabase::class.java,
                     "truedown.db"
-                ).fallbackToDestructiveMigration().build()
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

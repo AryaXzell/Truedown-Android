@@ -91,9 +91,6 @@ object VideoMemoryManager {
         try {
             coil.Coil.imageLoader(context).memoryCache?.clear()
         } catch (_: Exception) {}
-
-        // 3. Request JVM Garbage Collection
-        System.gc()
     }
 
     fun getAppUsedRamMb(activityManager: ActivityManager?): Long {

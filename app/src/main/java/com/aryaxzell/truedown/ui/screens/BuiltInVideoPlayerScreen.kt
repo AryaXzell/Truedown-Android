@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -202,6 +203,8 @@ fun BuiltInVideoPlayerScreen(
         }
     }
 
+    val scope = rememberCoroutineScope()
+
     DisposableEffect(exoPlayer) {
         val trimListener = {
             try {
@@ -209,9 +212,11 @@ fun BuiltInVideoPlayerScreen(
             } catch (_: Exception) {}
         }
         VideoMemoryManager.registerTrimListener(trimListener)
+        VideoMemoryManager.startMonitoring(context.applicationContext, scope)
 
         onDispose {
             VideoMemoryManager.unregisterTrimListener(trimListener)
+            VideoMemoryManager.stopMonitoring()
             exoPlayer.release()
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
