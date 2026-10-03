@@ -48,8 +48,8 @@ sealed class NightlyUpdateState {
 
 object NightlyUpdateManager {
 
-    private const val NIGHTLY_URL = "https://nightly.link/AryaXzell/Truedown-Android/workflows/build/main?preview&h=c9122b50d061e55e3d2d601154766a71c9e9de40"
     private const val GITHUB_RUNS_API = "https://api.github.com/repos/AryaXzell/Truedown-Android/actions/runs?branch=main&status=success&per_page=1"
+    private const val GITHUB_RELEASES_API = "https://api.github.com/repos/AryaXzell/Truedown-Android/releases?per_page=3"
 
     private val _updateState = MutableStateFlow<NightlyUpdateState>(NightlyUpdateState.Idle)
     val updateState: StateFlow<NightlyUpdateState> = _updateState.asStateFlow()
@@ -164,8 +164,6 @@ object NightlyUpdateManager {
                 val checkResult = checkForNightlyUpdate()
                 checkResult.onSuccess { runJson ->
                     val runId = runJson.optString("id", "")
-                    val commitMsg = runJson.optJSONObject("head_commit")?.optString("message", "Nightly Build") ?: "Nightly Build"
-                    val updatedAt = runJson.optString("updated_at", "")
                     AppLogger.i("NightlyUpdate", "Konfirmasi build aktif untuk diunduh: Run #$runId")
                 }
 
@@ -179,185 +177,266 @@ object NightlyUpdateManager {
                     return@withContext
                 }
 
-                // 2. Download ZIP Artifact
-                _updateState.value = NightlyUpdateState.Downloading(0f, 0L, 0L)
-                AppLogger.i("NightlyUpdate", "Mengunduh artefak ZIP dari: $NIGHTLY_URL")
-
-                val response = UpdateHistoryLogger.runWithExponentialBackoff(
-                    maxRetries = 3,
-                    initialDelayMs = 1500L,
-                    onRetry = { attempt, delayMs, ex ->
-                        AppLogger.w("NightlyUpdate", "Koneksi terputus (Upaya $attempt/3). Mencoba kembali dalam ${delayMs}ms...: ${ex.localizedMessage}")
-                    }
-                ) {
-                    val req = Request.Builder()
-                        .url(NIGHTLY_URL)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) Truedown-Android-App")
-                        .build()
-                    val resp = client.newCall(req).execute()
-                    if (!resp.isSuccessful) {
-                        throw Exception("Gagal mengunduh artefak Nightly (HTTP ${resp.code})")
-                    }
-                    resp
+                // 2. Tentukan kandidat URL unduhan Nightly langsung
+                val abiArtifactName = when {
+                    deviceAbi.contains("arm64") -> "truedown-arm64-v8a"
+                    deviceAbi.contains("v7a") -> "truedown-armeabi-v7a"
+                    else -> "truedown-universal"
                 }
 
-                val body = response.body
-                if (body == null) {
-                    val err = "Respon server kosong saat mengunduh artefak"
-                    _updateState.value = NightlyUpdateState.Error(err)
-                    UpdateHistoryLogger.logAttempt(context, "Nightly", "Nightly", "Failed", err)
-                    return@withContext
-                }
-
-                val contentType = body.contentType()?.toString()?.lowercase() ?: ""
-                if (contentType.contains("text/html")) {
-                    val err = "Artefak Nightly di GitHub belum tersedia atau link telah expired. Silakan coba beberapa saat lagi."
-                    _updateState.value = NightlyUpdateState.Error(err)
-                    AppLogger.e("NightlyUpdate", "Response berupa HTML, bukan berkas ZIP: $contentType")
-                    UpdateHistoryLogger.logAttempt(context, "Nightly", "Nightly", "Failed", err)
-                    return@withContext
-                }
-
-                val contentLength = body.contentLength()
-                val inputStream: InputStream = body.byteStream()
-                val outputStream = FileOutputStream(zipFile)
-
-                val buffer = ByteArray(8192)
-                var bytesRead: Int
-                var totalBytesRead = 0L
-
-                val startTime = System.currentTimeMillis()
-                var lastTime = startTime
-                var lastBytesRead = 0L
-                var currentSpeedBytesPerSec = 0L
-                var remainingSecs = -1L
-
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    outputStream.write(buffer, 0, bytesRead)
-                    totalBytesRead += bytesRead
-
-                    val now = System.currentTimeMillis()
-                    val timeDelta = now - lastTime
-                    if (timeDelta >= 400) {
-                        val bytesDelta = totalBytesRead - lastBytesRead
-                        currentSpeedBytesPerSec = (bytesDelta * 1000L) / timeDelta
-                        lastTime = now
-                        lastBytesRead = totalBytesRead
-
-                        if (currentSpeedBytesPerSec > 0 && contentLength > 0 && totalBytesRead < contentLength) {
-                            val remainingBytes = contentLength - totalBytesRead
-                            remainingSecs = remainingBytes / currentSpeedBytesPerSec
-                        }
-                    }
-
-                    val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
-                    _updateState.value = NightlyUpdateState.Downloading(
-                        progress = progress,
-                        downloadedBytes = totalBytesRead,
-                        totalBytes = contentLength,
-                        speedBytesPerSec = currentSpeedBytesPerSec,
-                        remainingSeconds = remainingSecs
-                    )
-                }
-
-                outputStream.flush()
-                outputStream.close()
-                inputStream.close()
-
-                AppLogger.i("NightlyUpdate", "Unduhan ZIP selesai (${zipFile.length()} bytes). Validasi file...")
-
-                // Validasi ukuran berkas ZIP terunduh untuk mencegah kesimpulan terlalu cepat
-                if (zipFile.length() < 100_000L) {
-                    val err = "Gagal mengunduh: Berkas artefak tidak lengkap (${zipFile.length()} bytes). Periksa koneksi internet Anda."
-                    _updateState.value = NightlyUpdateState.Error(err)
-                    AppLogger.e("NightlyUpdate", err)
-                    return@withContext
-                }
-
-                // 3. Ekstrak ZIP & Pilih APK Berdasarkan Arsitektur Pintar (Smart ABI Selection)
-                _updateState.value = NightlyUpdateState.Extracting("Mengekstrak dan memilih APK untuk arsitektur $deviceAbi...")
-
-                data class ApkCandidate(
-                    val entryName: String,
-                    val file: File,
-                    val score: Int
+                val candidateUrls = listOf(
+                    "https://nightly.link/AryaXzell/Truedown-Android/workflows/build/main/$abiArtifactName.zip",
+                    "https://nightly.link/AryaXzell/Truedown-Android/workflows/build.yml/main/$abiArtifactName.zip",
+                    "https://nightly.link/AryaXzell/Truedown-Android/workflows/build/main/truedown-universal.zip",
+                    "https://nightly.link/AryaXzell/Truedown-Android/workflows/build.yml/main/truedown-universal.zip"
                 )
 
-                val apkCandidates = mutableListOf<ApkCandidate>()
+                var downloadSuccess = false
+                var downloadedDirectApk: File? = null
 
-                try {
-                    val zipInputStream = ZipInputStream(zipFile.inputStream())
-                    var entry: ZipEntry? = zipInputStream.nextEntry
+                for (targetUrl in candidateUrls) {
+                    AppLogger.i("NightlyUpdate", "Mencoba mengunduh artefak dari: $targetUrl")
+                    _updateState.value = NightlyUpdateState.Downloading(0f, 0L, 0L)
 
-                    while (entry != null) {
-                        val entryName = entry.name
-                        if (!entry.isDirectory && entryName.endsWith(".apk", ignoreCase = true)) {
-                            val candidateFile = File(updateDir, "extracted_${apkCandidates.size}.apk")
-                            val apkOut = FileOutputStream(candidateFile)
+                    try {
+                        val req = Request.Builder()
+                            .url(targetUrl)
+                            .header("User-Agent", "Mozilla/5.0 (Linux; Android 12) Truedown-Android-App")
+                            .build()
+                        val resp = client.newCall(req).execute()
 
-                            val apkBuffer = ByteArray(8192)
-                            var apkBytesRead: Int
-                            while (zipInputStream.read(apkBuffer).also { apkBytesRead = it } != -1) {
-                                apkOut.write(apkBuffer, 0, apkBytesRead)
+                        if (resp.isSuccessful) {
+                            val body = resp.body
+                            val contentType = body?.contentType()?.toString()?.lowercase() ?: ""
+
+                            if (body != null && !contentType.contains("text/html")) {
+                                val contentLength = body.contentLength()
+                                val inputStream = body.byteStream()
+                                val outputStream = FileOutputStream(zipFile)
+
+                                val buffer = ByteArray(8192)
+                                var bytesRead: Int
+                                var totalBytesRead = 0L
+                                val startTime = System.currentTimeMillis()
+                                var lastTime = startTime
+                                var lastBytesRead = 0L
+                                var currentSpeedBytesPerSec = 0L
+                                var remainingSecs = -1L
+
+                                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                                    outputStream.write(buffer, 0, bytesRead)
+                                    totalBytesRead += bytesRead
+
+                                    val now = System.currentTimeMillis()
+                                    val timeDelta = now - lastTime
+                                    if (timeDelta >= 400) {
+                                        val bytesDelta = totalBytesRead - lastBytesRead
+                                        currentSpeedBytesPerSec = (bytesDelta * 1000L) / timeDelta
+                                        lastTime = now
+                                        lastBytesRead = totalBytesRead
+
+                                        if (currentSpeedBytesPerSec > 0 && contentLength > 0 && totalBytesRead < contentLength) {
+                                            val remainingBytes = contentLength - totalBytesRead
+                                            remainingSecs = remainingBytes / currentSpeedBytesPerSec
+                                        }
+                                    }
+
+                                    val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
+                                    _updateState.value = NightlyUpdateState.Downloading(
+                                        progress = progress,
+                                        downloadedBytes = totalBytesRead,
+                                        totalBytes = contentLength,
+                                        speedBytesPerSec = currentSpeedBytesPerSec,
+                                        remainingSeconds = remainingSecs
+                                    )
+                                }
+
+                                outputStream.flush()
+                                outputStream.close()
+                                inputStream.close()
+
+                                if (zipFile.exists() && zipFile.length() > 50_000L) {
+                                    downloadSuccess = true
+                                    AppLogger.i("NightlyUpdate", "Berhasil mengunduh artefak ZIP (${zipFile.length()} bytes)")
+                                    break
+                                }
                             }
-                            apkOut.flush()
-                            apkOut.close()
-
-                            val lowerName = entryName.lowercase()
-                            val score = when {
-                                lowerName.contains(deviceAbi.lowercase()) -> 100
-                                lowerName.contains("arm64") && deviceAbi.contains("arm64") -> 95
-                                lowerName.contains("v7a") && deviceAbi.contains("v7a") -> 95
-                                lowerName.contains("universal") -> 80
-                                else -> 50
-                            }
-
-                            AppLogger.i("NightlyUpdate", "Ditemukan APK: $entryName (Arsitektur Score: $score)")
-                            apkCandidates.add(ApkCandidate(entryName, candidateFile, score))
                         }
-                        zipInputStream.closeEntry()
-                        entry = zipInputStream.nextEntry
+                    } catch (e: Exception) {
+                        AppLogger.w("NightlyUpdate", "Kandidat URL gagal ($targetUrl): ${e.localizedMessage}")
                     }
-                    zipInputStream.close()
-
-                } catch (e: ZipException) {
-                    val err = "File ZIP artefak rusak atau terpotong saat pengunduhan. Silakan unduh ulang."
-                    _updateState.value = NightlyUpdateState.Error(err)
-                    AppLogger.e("NightlyUpdate", err, e)
-                    return@withContext
                 }
 
-                // Hapus file ZIP setelah diekstrak untuk menghemat ruang
-                if (zipFile.exists()) {
-                    zipFile.delete()
-                    AppLogger.i("NightlyUpdate", "File ZIP artefak berhasil dibersihkan setelah ekstraksi")
+                // Fallback cerdas: Jika artefak nightly.link sudah expired (>14 hari), coba ambil APK terbaru dari GitHub Releases
+                if (!downloadSuccess) {
+                    AppLogger.i("NightlyUpdate", "Artefak nightly.link tidak tersedia/expired. Mencoba fallback ke GitHub Releases...")
+                    try {
+                        val relReq = Request.Builder()
+                            .url(GITHUB_RELEASES_API)
+                            .header("User-Agent", "Truedown-Android-App")
+                            .header("Accept", "application/vnd.github.v3+json")
+                            .build()
+                        val relResp = client.newCall(relReq).execute()
+                        if (relResp.isSuccessful) {
+                            val relBody = relResp.body?.string() ?: ""
+                            val relArray = org.json.JSONArray(relBody)
+                            if (relArray.length() > 0) {
+                                val latestRelease = relArray.getJSONObject(0)
+                                val assets = latestRelease.optJSONArray("assets")
+                                var matchedApkUrl: String? = null
+                                var matchedApkSize = 0L
+
+                                if (assets != null) {
+                                    for (i in 0 until assets.length()) {
+                                        val asset = assets.getJSONObject(i)
+                                        val name = asset.optString("name", "").lowercase()
+                                        val downloadUrl = asset.optString("browser_download_url", "")
+                                        val size = asset.optLong("size", 0L)
+
+                                        if (name.endsWith(".apk") && (name.contains(deviceAbi.lowercase()) || name.contains("universal"))) {
+                                            matchedApkUrl = downloadUrl
+                                            matchedApkSize = size
+                                            if (name.contains(deviceAbi.lowercase())) break
+                                        }
+                                    }
+                                }
+
+                                if (matchedApkUrl != null) {
+                                    AppLogger.i("NightlyUpdate", "Fallback APK ditemukan dari Release: $matchedApkUrl")
+                                    val directApkFile = File(updateDir, "truedown_update.apk")
+                                    val apkReq = Request.Builder().url(matchedApkUrl).build()
+                                    val apkResp = client.newCall(apkReq).execute()
+
+                                    if (apkResp.isSuccessful && apkResp.body != null) {
+                                        val apkBody = apkResp.body!!
+                                        val apkStream = apkBody.byteStream()
+                                        val apkOut = FileOutputStream(directApkFile)
+                                        val apkBuffer = ByteArray(8192)
+                                        var r: Int
+                                        var total = 0L
+                                        val len = if (matchedApkSize > 0) matchedApkSize else apkBody.contentLength()
+
+                                        while (apkStream.read(apkBuffer).also { r = it } != -1) {
+                                            apkOut.write(apkBuffer, 0, r)
+                                            total += r
+                                            val progress = if (len > 0) (total.toFloat() / len.toFloat()).coerceIn(0f, 1f) else 0f
+                                            _updateState.value = NightlyUpdateState.Downloading(
+                                                progress = progress,
+                                                downloadedBytes = total,
+                                                totalBytes = len
+                                            )
+                                        }
+                                        apkOut.flush()
+                                        apkOut.close()
+                                        apkStream.close()
+
+                                        if (directApkFile.exists() && directApkFile.length() > 100_000L) {
+                                            downloadedDirectApk = directApkFile
+                                            downloadSuccess = true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.w("NightlyUpdate", "Fallback release gagal: ${e.localizedMessage}")
+                    }
                 }
 
-                if (apkCandidates.isEmpty()) {
-                    val err = "Artefak terunduh tidak berisi berkas .apk. Silakan coba lagi nanti."
+                if (!downloadSuccess) {
+                    val err = "Artefak Nightly di GitHub belum tersedia atau masa simpan (14 hari) telah berakhir. Silakan gunakan tombol Buka di Browser atau perbarui lewat Saluran Stabil."
                     _updateState.value = NightlyUpdateState.Error(err)
                     AppLogger.e("NightlyUpdate", err)
+                    UpdateHistoryLogger.logAttempt(context, "Nightly", "Nightly", "Failed", err)
                     return@withContext
                 }
 
-                // Pilih APK kandidat dengan skor arsitektur tertinggi
-                val bestCandidate = apkCandidates.maxByOrNull { it.score }!!
-                val finalApkFile = File(updateDir, "truedown_update.apk")
-                bestCandidate.file.renameTo(finalApkFile)
+                // 3. Ekstrak ZIP jika berupa berkas ZIP atau gunakan APK langsung
+                if (downloadedDirectApk != null && downloadedDirectApk.exists()) {
+                    extractedApk = downloadedDirectApk
+                    _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
+                    UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
+                } else {
+                    _updateState.value = NightlyUpdateState.Extracting("Mengekstrak dan memilih APK untuk arsitektur $deviceAbi...")
 
-                // Bersihkan kandidat lain
-                apkCandidates.forEach { candidate ->
-                    if (candidate.file.exists()) candidate.file.delete()
+                    data class ApkCandidate(
+                        val entryName: String,
+                        val file: File,
+                        val score: Int
+                    )
+
+                    val apkCandidates = mutableListOf<ApkCandidate>()
+
+                    try {
+                        val zipInputStream = ZipInputStream(zipFile.inputStream())
+                        var entry: ZipEntry? = zipInputStream.nextEntry
+
+                        while (entry != null) {
+                            val entryName = entry.name
+                            if (!entry.isDirectory && entryName.endsWith(".apk", ignoreCase = true)) {
+                                val candidateFile = File(updateDir, "extracted_${apkCandidates.size}.apk")
+                                val apkOut = FileOutputStream(candidateFile)
+
+                                val apkBuffer = ByteArray(8192)
+                                var apkBytesRead: Int
+                                while (zipInputStream.read(apkBuffer).also { apkBytesRead = it } != -1) {
+                                    apkOut.write(apkBuffer, 0, apkBytesRead)
+                                }
+                                apkOut.flush()
+                                apkOut.close()
+
+                                val lowerName = entryName.lowercase()
+                                val score = when {
+                                    lowerName.contains(deviceAbi.lowercase()) -> 100
+                                    lowerName.contains("arm64") && deviceAbi.contains("arm64") -> 95
+                                    lowerName.contains("v7a") && deviceAbi.contains("v7a") -> 95
+                                    lowerName.contains("universal") -> 80
+                                    else -> 50
+                                }
+
+                                AppLogger.i("NightlyUpdate", "Ditemukan APK: $entryName (Arsitektur Score: $score)")
+                                apkCandidates.add(ApkCandidate(entryName, candidateFile, score))
+                            }
+                            zipInputStream.closeEntry()
+                            entry = zipInputStream.nextEntry
+                        }
+                        zipInputStream.close()
+
+                    } catch (e: ZipException) {
+                        val err = "File ZIP artefak rusak atau terpotong saat pengunduhan. Silakan unduh ulang."
+                        _updateState.value = NightlyUpdateState.Error(err)
+                        AppLogger.e("NightlyUpdate", err, e)
+                        return@withContext
+                    }
+
+                    if (zipFile.exists()) {
+                        zipFile.delete()
+                    }
+
+                    if (apkCandidates.isEmpty()) {
+                        val err = "Artefak terunduh tidak berisi berkas .apk. Silakan coba lagi nanti."
+                        _updateState.value = NightlyUpdateState.Error(err)
+                        AppLogger.e("NightlyUpdate", err)
+                        return@withContext
+                    }
+
+                    val bestCandidate = apkCandidates.maxByOrNull { it.score }!!
+                    val finalApkFile = File(updateDir, "truedown_update.apk")
+                    bestCandidate.file.renameTo(finalApkFile)
+
+                    apkCandidates.forEach { candidate ->
+                        if (candidate.file.exists()) candidate.file.delete()
+                    }
+
+                    extractedApk = finalApkFile
+                    AppLogger.i("NightlyUpdate", "Pilihan APK Optimal (${bestCandidate.entryName}) untuk $deviceAbi berhasil disiapkan: ${extractedApk.length()} bytes")
+                    _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
+                    UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
                 }
-
-                extractedApk = finalApkFile
-                AppLogger.i("NightlyUpdate", "Pilihan APK Optimal (${bestCandidate.entryName}) untuk $deviceAbi berhasil disiapkan: ${extractedApk.length()} bytes")
-                _updateState.value = NightlyUpdateState.ReadyToInstall(extractedApk, deviceAbi)
-                UpdateHistoryLogger.logAttempt(context, "Nightly Build", "Nightly", "Success")
 
                 // 4. Jalankan Instalasi APK In-App
                 withContext(Dispatchers.Main) {
-                    installApk(context, extractedApk)
+                    extractedApk?.let { installApk(context, it) }
                 }
 
             } catch (e: Exception) {

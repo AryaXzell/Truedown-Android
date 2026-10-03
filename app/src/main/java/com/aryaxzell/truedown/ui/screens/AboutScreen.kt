@@ -404,7 +404,7 @@ fun AboutScreen(
                             showNightlyOptionsDialog = false
                             val browserIntent = Intent(
                                 Intent.ACTION_VIEW,
-                                Uri.parse("https://nightly.link/AryaXzell/Truedown-Android/workflows/build/main?preview&h=c9122b50d061e55e3d2d601154766a71c9e9de40")
+                                Uri.parse("https://nightly.link/AryaXzell/Truedown-Android/workflows/build/main")
                             )
                             context.startActivity(browserIntent)
                         },
