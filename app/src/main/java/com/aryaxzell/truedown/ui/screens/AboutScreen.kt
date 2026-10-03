@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Warning
@@ -68,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.aryaxzell.truedown.BuildConfig
 import com.aryaxzell.truedown.R
+import com.aryaxzell.truedown.ui.components.ChangelogModal
 import com.aryaxzell.truedown.util.NightlyUpdateManager
 import com.aryaxzell.truedown.util.NightlyUpdateState
 import kotlinx.coroutines.launch
@@ -83,6 +85,7 @@ fun AboutScreen(
     val updateState by NightlyUpdateManager.updateState.collectAsState()
 
     var showNightlyOptionsDialog by remember { mutableStateOf(false) }
+    var showChangelogModal by remember { mutableStateOf(false) }
 
     BackHandler {
         onBack()
@@ -229,6 +232,25 @@ fun AboutScreen(
                     testTag = "about_check_update_nightly_row",
                     iconContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     iconTint = MaterialTheme.colorScheme.tertiary,
+                    showExternalIcon = false
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                )
+
+                // Catatan Rilis (Changelog Modal)
+                AboutClickableRow(
+                    icon = Icons.Default.History,
+                    title = "Catatan Rilis (Changelog)",
+                    subtitle = "Lihat riwayat pembaruan dan fitur baru aplikasi",
+                    onClick = {
+                        showChangelogModal = true
+                    },
+                    testTag = "about_changelog_row",
+                    iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    iconTint = MaterialTheme.colorScheme.secondary,
                     showExternalIcon = false
                 )
             }
@@ -455,24 +477,100 @@ fun AboutScreen(
                     when (currentState) {
                         is NightlyUpdateState.Downloading -> {
                             val percent = (currentState.progress * 100).toInt()
+
+                            // Headline Percentage Badge
+                            Text(
+                                text = "$percent%",
+                                style = MaterialTheme.typography.headlineLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+
+                            // Smooth Visual Progress Bar
                             LinearProgressIndicator(
                                 progress = { currentState.progress },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(8.dp)
-                                    .clip(RoundedCornerShape(4.dp))
+                                    .height(10.dp)
+                                    .clip(RoundedCornerShape(6.dp))
                             )
-                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Download Metrics Box (Size, Speed, ETA)
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(18.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Ukuran Terunduh",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Text(
+                                            text = "${formatBytes(currentState.downloadedBytes)} / ${if (currentState.totalBytes > 0) formatBytes(currentState.totalBytes) else "..."}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Kecepatan Unduh",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Text(
+                                            text = "${formatBytes(currentState.speedBytesPerSec)}/s",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Estimasi Sisa Waktu",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                        Text(
+                                            text = formatDuration(currentState.remainingSeconds),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
                             Text(
-                                text = "$percent% • ${formatBytes(currentState.downloadedBytes)} / ${if (currentState.totalBytes > 0) formatBytes(currentState.totalBytes) else "..."}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Mengunduh file ZIP artefak langsung dari GitHub Nightly Link...",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "Mengunduh artefak Nightly secara langsung...",
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.outline,
                                 textAlign = TextAlign.Center
                             )
@@ -565,6 +663,13 @@ fun AboutScreen(
             }
         )
     }
+
+    // Changelog Modal Dialog
+    if (showChangelogModal) {
+        ChangelogModal(
+            onDismiss = { showChangelogModal = false }
+        )
+    }
 }
 
 private fun formatBytes(bytes: Long): String {
@@ -572,6 +677,19 @@ private fun formatBytes(bytes: Long): String {
     val units = arrayOf("B", "KB", "MB", "GB")
     val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt().coerceIn(0, units.size - 1)
     return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+}
+
+private fun formatDuration(seconds: Long): String {
+    return when {
+        seconds < 0 -> "Menghitung..."
+        seconds == 0L -> "Hampir Selesai"
+        seconds < 60 -> "$seconds dtk"
+        else -> {
+            val mins = seconds / 60
+            val secs = seconds % 60
+            if (secs > 0) "$mins mnt $secs dtk" else "$mins mnt"
+        }
+    }
 }
 
 @Composable

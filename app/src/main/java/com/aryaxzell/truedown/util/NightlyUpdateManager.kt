@@ -22,7 +22,13 @@ import java.util.zip.ZipInputStream
 
 sealed class NightlyUpdateState {
     object Idle : NightlyUpdateState()
-    data class Downloading(val progress: Float, val downloadedBytes: Long, val totalBytes: Long) : NightlyUpdateState()
+    data class Downloading(
+        val progress: Float,
+        val downloadedBytes: Long,
+        val totalBytes: Long,
+        val speedBytesPerSec: Long = 0L,
+        val remainingSeconds: Long = -1L
+    ) : NightlyUpdateState()
     data class Extracting(val status: String) : NightlyUpdateState()
     data class ReadyToInstall(val apkFile: File) : NightlyUpdateState()
     data class Error(val message: String) : NightlyUpdateState()
@@ -109,11 +115,38 @@ object NightlyUpdateManager {
                 var bytesRead: Int
                 var totalBytesRead = 0L
 
+                val startTime = System.currentTimeMillis()
+                var lastTime = startTime
+                var lastBytesRead = 0L
+                var currentSpeedBytesPerSec = 0L
+                var remainingSecs = -1L
+
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
                     outputStream.write(buffer, 0, bytesRead)
                     totalBytesRead += bytesRead
+
+                    val now = System.currentTimeMillis()
+                    val timeDelta = now - lastTime
+                    if (timeDelta >= 400) {
+                        val bytesDelta = totalBytesRead - lastBytesRead
+                        currentSpeedBytesPerSec = (bytesDelta * 1000L) / timeDelta
+                        lastTime = now
+                        lastBytesRead = totalBytesRead
+
+                        if (currentSpeedBytesPerSec > 0 && contentLength > 0 && totalBytesRead < contentLength) {
+                            val remainingBytes = contentLength - totalBytesRead
+                            remainingSecs = remainingBytes / currentSpeedBytesPerSec
+                        }
+                    }
+
                     val progress = if (contentLength > 0) (totalBytesRead.toFloat() / contentLength.toFloat()).coerceIn(0f, 1f) else 0f
-                    _updateState.value = NightlyUpdateState.Downloading(progress, totalBytesRead, contentLength)
+                    _updateState.value = NightlyUpdateState.Downloading(
+                        progress = progress,
+                        downloadedBytes = totalBytesRead,
+                        totalBytes = contentLength,
+                        speedBytesPerSec = currentSpeedBytesPerSec,
+                        remainingSeconds = remainingSecs
+                    )
                 }
 
                 outputStream.flush()
